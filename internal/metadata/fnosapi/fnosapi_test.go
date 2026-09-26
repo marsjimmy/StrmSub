@@ -74,15 +74,19 @@ func mockFnos(t *testing.T) *httptest.Server {
 		case r.URL.Path == "/v/api/v1/item/list":
 			write(0, map[string]any{"total": 2, "list": []any{
 				map[string]any{"guid": "m1", "title": "沙丘", "category": "Movie",
-					"original_title": "Dune", "year": 2021, "imdb_id": "tt1160419"},
+					"original_title": "Dune", "year": 2021, "imdb_id": "tt1160419",
+					"overview": "沙漠星球史诗", "poster": "/v/api/v1/poster/m1"},
 				map[string]any{"guid": "t1", "title": "权力的游戏", "category": "TV",
-					"year": 2011, "imdb_id": "tt0944947"},
+					"year": 2011, "imdb_id": "tt0944947", "overview": "铁王座之争",
+					"poster": "/v/api/v1/poster/t1"},
 			}})
 		case r.URL.Path == "/v/api/v1/season/list/t1":
-			write(0, []any{map[string]any{"guid": "s1", "title": "第一季"}})
+			write(0, []any{map[string]any{"guid": "s1", "title": "第一季",
+				"season": 1, "overview": "第一季简介", "poster": "/v/api/v1/poster/s1"}})
 		case r.URL.Path == "/v/api/v1/episode/list/s1":
 			write(0, []any{map[string]any{"guid": "e1", "title": "第一集",
-				"meta": map[string]any{"season": 1, "episode": 1}}})
+				"meta": map[string]any{"season": 1, "episode": 1},
+				"overview": "首集简介"}})
 		case r.URL.Path == "/v/api/v1/item/m1":
 			write(0, map[string]any{"guid": "m1", "file_path": "/vol1/media/电影/沙丘 (2021)/沙丘.strm"})
 		case r.URL.Path == "/v/api/v1/item/e1":
@@ -105,8 +109,8 @@ func TestListMedia(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 {
-		t.Fatalf("期望 2 条，实际 %d: %+v", len(got), got)
+	if len(got) != 4 {
+		t.Fatalf("期望 4 条（电影+剧+季+集），实际 %d: %+v", len(got), got)
 	}
 	byID := map[string]metadata.MediaInfo{}
 	for _, m := range got {
@@ -117,12 +121,38 @@ func TestListMedia(t *testing.T) {
 		movie.ImdbID != "tt1160419" || movie.OriginalTitle != "Dune" {
 		t.Errorf("电影解析错误: %+v", movie)
 	}
+	if movie.Overview != "沙漠星球史诗" || movie.PosterURL != "/v/api/v1/poster/m1" {
+		t.Errorf("电影简介/海报解析错误: %+v", movie)
+	}
 	if movie.FilePath != "/media/电影/沙丘 (2021)/沙丘.strm" {
 		t.Errorf("路径映射错误: %q", movie.FilePath)
+	}
+	series := byID["t1"]
+	if series.Type != metadata.Series || series.Title != "权力的游戏" || series.Year != 2011 {
+		t.Errorf("剧条目解析错误: %+v", series)
+	}
+	if series.Overview != "铁王座之争" || series.PosterURL != "/v/api/v1/poster/t1" {
+		t.Errorf("剧简介/海报解析错误: %+v", series)
+	}
+	if series.FilePath != "" {
+		t.Errorf("剧条目不应有文件路径: %+v", series)
+	}
+	season := byID["s1"]
+	if season.Type != metadata.Season || season.Season != 1 || season.SeriesID != "t1" {
+		t.Errorf("季条目解析错误: %+v", season)
+	}
+	if season.Overview != "第一季简介" || season.PosterURL != "/v/api/v1/poster/s1" {
+		t.Errorf("季简介/海报解析错误: %+v", season)
 	}
 	ep := byID["e1"]
 	if ep.Type != metadata.Episode || ep.Title != "权力的游戏" || ep.Season != 1 || ep.Episode != 1 || ep.Year != 2011 {
 		t.Errorf("剧集解析错误: %+v", ep)
+	}
+	if ep.SeriesID != "t1" {
+		t.Errorf("剧集 SeriesID 错误: %+v", ep)
+	}
+	if ep.Overview != "首集简介" {
+		t.Errorf("剧集简介解析错误: %+v", ep)
 	}
 	if ep.FilePath != "/media/剧集/权力的游戏/S01E01.strm" {
 		t.Errorf("剧集路径映射错误: %q", ep.FilePath)

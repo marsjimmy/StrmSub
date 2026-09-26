@@ -24,6 +24,8 @@ type nfoMovie struct {
 	OriginalTitle string     `xml:"originaltitle"`
 	Year          int        `xml:"year"`
 	Premiered     string     `xml:"premiered"`
+	Plot          string     `xml:"plot"`
+	Thumb         string     `xml:"thumb"`
 	UniqueIDs     []uniqueID `xml:"uniqueid"`
 }
 
@@ -34,6 +36,8 @@ type nfoEpisode struct {
 	Season    int        `xml:"season"`
 	Episode   int        `xml:"episode"`
 	Aired     string     `xml:"aired"`
+	Plot      string     `xml:"plot"`
+	Thumb     string     `xml:"thumb"`
 	UniqueIDs []uniqueID `xml:"uniqueid"`
 }
 
@@ -93,6 +97,8 @@ func ParseFile(path string) (metadata.MediaInfo, bool) {
 			mi.Year, _ = strconv.Atoi(m.Premiered[:4])
 		}
 		mi.ImdbID, mi.TmdbID = ids(m.UniqueIDs)
+		mi.Overview = strings.TrimSpace(m.Plot)
+		mi.PosterURL = resolveNFOThumb(path, strings.TrimSpace(m.Thumb))
 	case "episodedetails":
 		var e nfoEpisode
 		if err := xml.Unmarshal(data, &e); err != nil {
@@ -108,6 +114,8 @@ func ParseFile(path string) (metadata.MediaInfo, bool) {
 			mi.Year, _ = strconv.Atoi(e.Aired[:4])
 		}
 		mi.ImdbID, mi.TmdbID = ids(e.UniqueIDs)
+		mi.Overview = strings.TrimSpace(e.Plot)
+		mi.PosterURL = resolveNFOThumb(path, strings.TrimSpace(e.Thumb))
 	default:
 		return metadata.MediaInfo{}, false // tvshow/season 等暂不需要
 	}
@@ -115,6 +123,21 @@ func ParseFile(path string) (metadata.MediaInfo, bool) {
 		return metadata.MediaInfo{}, false
 	}
 	return mi, true
+}
+
+// resolveNFOThumb 把 NFO 里的 thumb 解析成可用引用：URL 原样返回，
+// 相对文件名按 NFO 同目录解析成绝对路径（pipeline 会拷贝到 data/posters/）。
+func resolveNFOThumb(nfoPath, thumb string) string {
+	if thumb == "" {
+		return ""
+	}
+	if strings.HasPrefix(thumb, "http://") || strings.HasPrefix(thumb, "https://") {
+		return thumb
+	}
+	if filepath.IsAbs(thumb) {
+		return thumb
+	}
+	return filepath.Join(filepath.Dir(nfoPath), thumb)
 }
 
 // ListMedia 扫描媒体目录，为每个 .strm 找同名 .nfo 配对

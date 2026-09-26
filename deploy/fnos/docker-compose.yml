@@ -4,7 +4,7 @@
 # 仪表盘: http://<飞牛IP>:8099  → 右上角 ⚙️ 设置里配飞牛影视 API
 services:
   strmsub:
-    image: marsjimmyliu/strmsub:v1.0.3
+    image: marsjimmyliu/strmsub:v1.0.5
     container_name: strmsub
     restart: unless-stopped
     ports:

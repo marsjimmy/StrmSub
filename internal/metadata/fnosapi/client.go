@@ -235,3 +235,73 @@ func (c *Client) Get(ctx context.Context, path string, query map[string]string) 
 func (c *Client) Post(ctx context.Context, path string, body any) (json.RawMessage, error) {
 	return c.do(ctx, "POST", path, nil, body)
 }
+
+// GetBytes 下载二进制（海报用）：相对路径拼到 base 上，绝对 URL 直接用，均带认证头。
+// 校验魔数，只接受 JPEG/PNG/WebP/GIF。
+func (c *Client) GetBytes(ctx context.Context, ref string) ([]byte, error) {
+	if err := c.ensureToken(ctx); err != nil {
+		return nil, err
+	}
+	var u, signPath string
+	switch {
+	case strings.HasPrefix(ref, "http://") || strings.HasPrefix(ref, "https://"):
+		u = ref
+		if strings.HasPrefix(ref, c.base) {
+			signPath = strings.TrimPrefix(ref, c.base)
+		}
+	case strings.HasPrefix(ref, "/"):
+		u = c.base + ref
+		signPath = ref
+	default:
+		return nil, fmt.Errorf("不支持的海报引用: %s", ref)
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	token := c.token
+	c.mu.Unlock()
+	req.Header.Set("Authorization", token)
+	req.Header.Set("Trim-MC-token", token)
+	if signPath != "" && strings.HasPrefix(signPath, apiPrefix+"/") && signPath != loginPath {
+		req.Header.Set("Authx", authxHeader("GET", signPath, nil, nil))
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("海报下载失败 %s: %w", ref, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("海报下载 %s: HTTP %d", ref, resp.StatusCode)
+	}
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if !isImageBytes(raw) {
+		return nil, fmt.Errorf("海报 %s 不是图片", ref)
+	}
+	return raw, nil
+}
+
+func isImageBytes(b []byte) bool {
+	if len(b) < 4 {
+		return false
+	}
+	// JPEG
+	if b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF {
+		return true
+	}
+	// PNG
+	if b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G' {
+		return true
+	}
+	// GIF
+	if b[0] == 'G' && b[1] == 'I' && b[2] == 'F' {
+		return true
+	}
+	// WebP: RIFF....WEBP
+	if len(b) >= 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F' &&
+		b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P' {
+		return true
+	}
+	return false
+}

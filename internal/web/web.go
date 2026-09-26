@@ -20,11 +20,12 @@ type Server struct {
 	pipe    *pipeline.Pipeline
 	sched   *scheduler.Scheduler
 	stg     *config.Settings
+	dataDir string
 	rebuild func() // 设置变更后热重载 provider
 }
 
-func New(st *store.Store, pipe *pipeline.Pipeline, sched *scheduler.Scheduler, stg *config.Settings, rebuild func()) *Server {
-	return &Server{store: st, pipe: pipe, sched: sched, stg: stg, rebuild: rebuild}
+func New(st *store.Store, pipe *pipeline.Pipeline, sched *scheduler.Scheduler, stg *config.Settings, dataDir string, rebuild func()) *Server {
+	return &Server{store: st, pipe: pipe, sched: sched, stg: stg, dataDir: dataDir, rebuild: rebuild}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -33,6 +34,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/media", s.handleMedia)
 	mux.HandleFunc("POST /api/scan", s.handleScan)
 	mux.HandleFunc("POST /api/search-one", s.handleSearchOne)
+	mux.HandleFunc("GET /api/library/movies", s.handleLibraryMovies)
+	mux.HandleFunc("GET /api/library/series", s.handleLibrarySeries)
+	mux.HandleFunc("GET /api/library/seasons", s.handleLibrarySeasons)
+	mux.HandleFunc("GET /api/library/episodes", s.handleLibraryEpisodes)
+	mux.HandleFunc("GET /api/poster", s.handlePoster)
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("POST /api/settings", s.handleSaveSettings)
 	mux.HandleFunc("POST /api/fnos/test", s.handleTestFnos)

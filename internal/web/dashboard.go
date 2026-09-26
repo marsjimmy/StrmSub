@@ -61,6 +61,36 @@ th{color:var(--dim);font-weight:500;font-size:13px}
 .toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
 .toolbar input[type=text]{background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px 14px;font-size:15px;flex:1;min-width:180px}
 @media(max-width:640px){.path{display:none}}
+/* ---- 媒体库：海报墙 ---- */
+.subtabs{display:flex;gap:8px;margin-bottom:12px}
+.subtab{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:20px;padding:8px 20px;font-size:14px;cursor:pointer}
+.subtab.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.crumb{font-size:13px;color:var(--dim);margin-bottom:12px}
+.crumb a{color:var(--acc);cursor:pointer;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+@media(max-width:900px){.grid5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.grid5{grid-template-columns:repeat(2,1fr);gap:10px}}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .15s}
+.pcard:hover{transform:translateY(-3px);border-color:var(--acc)}
+.pimg{position:relative;aspect-ratio:2/3;background:#232838;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pimg .pt{font-size:15px;font-weight:700;color:var(--dim);padding:0 12px;text-align:center;line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.pimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pmeta{padding:10px 12px}
+.pmeta .t{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pmeta .s{font-size:12px;color:var(--dim);margin-top:4px}
+.shead{display:flex;gap:16px;margin-bottom:16px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.shead .pimg{width:110px;flex-shrink:0;border-radius:8px}
+.shead .info{flex:1;min-width:0}
+.shead .info h3{margin:0 0 6px;font-size:17px}
+.shead .info .ov{font-size:13px;color:var(--dim);line-height:1.7;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.eprow{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.eprow .ep{flex-shrink:0;background:#232838;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:700}
+.eprow .ov{flex:1;font-size:13px;color:var(--dim);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-width:0}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.mbox{background:var(--card);border:1px solid var(--line);border-radius:16px;max-width:560px;width:100%;max-height:85vh;overflow:auto;padding:20px}
+.mbox .shead{background:none;border:0;padding:0}
+.mrow{display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -84,14 +114,19 @@ th{color:var(--dim);font-weight:500;font-size:13px}
 </div>
 
 <div id="viewLib" style="display:none">
-  <div class="toolbar">
-    <input type="text" id="libFilter" placeholder="搜索片名…" oninput="renderLib()">
-    <button class="ghost small" onclick="loadLib()">刷新</button>
+  <div class="subtabs">
+    <button class="subtab on" id="subMovies" onclick="setLibTab('movies')">🎬 电影</button>
+    <button class="subtab" id="subSeries" onclick="setLibTab('series')">📺 电视剧</button>
   </div>
-  <table>
-    <thead><tr><th>影片</th><th>类型</th><th>年份</th><th>IMDb</th><th>字幕状态</th><th>操作</th></tr></thead>
-    <tbody id="libRows"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
-  </table>
+  <div class="toolbar">
+    <input type="text" id="libFilter" placeholder="搜索片名…" oninput="renderLibView()">
+    <button class="ghost small" onclick="renderLibView(true)">刷新</button>
+  </div>
+  <div class="crumb" id="libCrumb"></div>
+  <div id="libBox"><div class="empty">加载中…</div></div>
+</div>
+<div class="modal" id="movieModal" style="display:none" onclick="if(event.target===this)closeMovie()">
+  <div class="mbox" id="movieBox"></div>
 </div>
 
 <div id="viewSet" style="display:none">
@@ -146,6 +181,10 @@ th{color:var(--dim);font-weight:500;font-size:13px}
       <input type="text" id="sSubdl" placeholder="未设置">
     </div>
     <div class="row">
+      <div><label>SubHD / 迅雷字幕</label><div class="hint">免 key，已自动启用：SubHD 按标题搜索（走站内预览接口下载），迅雷按视频特征 CID 查询（.strm 指向 http(s) 且支持 Range 时有效）</div></div>
+      <div style="color:#7d8590;font-size:13px">已启用 ✓</div>
+    </div>
+    <div class="row">
       <div><label>扫描间隔（分钟）</label><div class="hint">定时全量扫描，保存后立即生效</div></div>
       <input type="number" id="sInterval" min="5" max="1440" placeholder="30">
     </div>
@@ -163,16 +202,18 @@ th{color:var(--dim);font-weight:500;font-size:13px}
 </div>
 
 <script>
-var libData = [];
+var libTab = 'movies';       // movies | series
+var libSeriesId = null, libSeriesTitle = '', libSeriesPoster = '', libSeriesOv = '', libSeason = 0;
+var libMovies = [], libSeries = [];
 function showTab(t){
-  document.getElementById('viewOv').style.display = t==='ov'?'':'none';
   document.getElementById('viewLib').style.display = t==='lib'?'':'none';
+  document.getElementById('viewOv').style.display = t==='ov'?'':'none';
   document.getElementById('viewSet').style.display = t==='set'?'':'none';
   document.getElementById('tabOv').classList.toggle('on', t==='ov');
   document.getElementById('tabLib').classList.toggle('on', t==='lib');
   document.getElementById('tabSet').classList.toggle('on', t==='set');
   if(t==='set') loadSettings();
-  if(t==='lib') loadLib();
+  if(t==='lib') renderLibView(true);
 }
 function mediaName(m){
   if(m.Type==='episode') return m.Title+' S'+String(m.Season).padStart(2,'0')+'E'+String(m.Episode).padStart(2,'0');
@@ -197,8 +238,9 @@ async function load(){
   document.getElementById('envline').innerHTML =
     '元数据源：<b>'+esc(prov)+'</b>　字幕源：<b>'+esc(srcs)+'</b><br>目标语言：<b>'+esc(st.targetLang||'-')+'</b>　扫描间隔：<b>'+esc(st.scanInterval||'-')+'</b>';
   const tb = document.getElementById('rows');
-  if(!media || !media.length){ tb.innerHTML='<tr><td colspan="5" class="empty">暂无媒体，请点"立即扫描"</td></tr>'; return; }
-  tb.innerHTML = media.slice(0,200).map(m=>
+  var show = (media||[]).filter(m=>m.Type==='movie'||m.Type==='episode');
+  if(!show.length){ tb.innerHTML='<tr><td colspan="5" class="empty">暂无媒体，请点"立即扫描"</td></tr>'; return; }
+  tb.innerHTML = show.slice(0,200).map(m=>
     '<tr><td>'+esc(mediaName(m))+'</td><td>'+(m.Year||'-')+'</td><td>'+statusBadge(m.SubStatus)+'</td>'+
     '<td class="src">'+esc(m.SubSource||'-')+'</td><td class="path">'+esc(m.FilePath||'')+'</td></tr>'
   ).join('');
@@ -211,27 +253,99 @@ async function triggerScan(){
   await fetch('/api/scan',{method:'POST'});
   setTimeout(()=>{ b.disabled=false; b.textContent='立即扫描'; load(); }, 8000);
 }
-async function loadLib(){
-  const tb = document.getElementById('libRows');
-  tb.innerHTML = '<tr><td colspan="6" class="empty">加载中…</td></tr>';
-  try{
-    libData = await fetch('/api/media').then(r=>r.json());
-  }catch(e){ libData = []; }
-  renderLib();
+function setLibTab(t){
+  libTab = t; libSeriesId = null; libSeason = 0;
+  document.getElementById('subMovies').classList.toggle('on', t==='movies');
+  document.getElementById('subSeries').classList.toggle('on', t==='series');
+  renderLibView(true);
 }
-function renderLib(){
-  const tb = document.getElementById('libRows');
+function libCrumbHTML(){
+  var h = '<a onclick="libBack(\'root\')">媒体库</a>';
+  if(libTab==='movies') h += ' / 电影';
+  else h += ' / <a onclick="libBack(\'series\')">电视剧</a>';
+  if(libSeriesId) h += ' / <a onclick="libBack(\'seasons\')">'+esc(libSeriesTitle)+'</a>';
+  if(libSeason) h += ' / 第 '+libSeason+' 季';
+  return h;
+}
+function libBack(where){
+  if(where==='root'){ libSeriesId=null; libSeason=0; }
+  if(where==='series'){ libTab='series'; libSeriesId=null; libSeason=0;
+    document.getElementById('subMovies').classList.toggle('on', false);
+    document.getElementById('subSeries').classList.toggle('on', true); }
+  if(where==='seasons'){ libSeason=0; }
+  renderLibView();
+}
+function posterImg(poster, title){
+  if(poster) return '<img loading="lazy" src="'+poster+'" alt="" onerror="this.remove()">';
+  return '';
+}
+function pcardHTML(it, onclick){
+  return '<div class="pcard" onclick="'+onclick+'"><div class="pimg"><span class="pt">'+esc(it.title)+'</span>'+
+    posterImg(it.poster, it.title)+'</div><div class="pmeta"><div class="t">'+esc(it.title)+'</div>'+
+    '<div class="s">'+(it.year||'')+'</div></div></div>';
+}
+async function renderLibView(force){
+  const box = document.getElementById('libBox');
+  document.getElementById('libCrumb').innerHTML = libCrumbHTML();
   const q = document.getElementById('libFilter').value.trim().toLowerCase();
-  var list = libData || [];
-  if(q) list = list.filter(m=>(m.Title||'').toLowerCase().indexOf(q)>=0);
-  if(!list.length){ tb.innerHTML='<tr><td colspan="6" class="empty">暂无媒体，请先点"立即扫描"</td></tr>'; return; }
-  tb.innerHTML = list.slice(0,500).map(m=>{
-    const typeBadge = m.Type==='episode' ? '<span class="badge info">剧集</span>' : '<span class="badge info">电影</span>';
-    return '<tr><td>'+esc(mediaName(m))+'</td><td>'+typeBadge+'</td><td>'+(m.Year||'-')+'</td>'+
-      '<td class="src">'+esc(m.ImdbID||'-')+'</td><td>'+statusBadge(m.SubStatus)+'</td>'+
-      '<td><button class="small" data-id="'+esc(m.ID)+'" onclick="searchOne(this)">搜字幕</button></td></tr>';
-  }).join('');
+  const match = it => !q || (it.title||'').toLowerCase().indexOf(q)>=0;
+  box.innerHTML = '<div class="empty">加载中…</div>';
+  try{
+    if(libTab==='movies' && !libSeriesId){
+      if(force || !libMovies.length) libMovies = await fetch('/api/library/movies').then(r=>r.json());
+      var list = (libMovies||[]).filter(match);
+      if(!list.length){ box.innerHTML='<div class="empty">暂无电影，请先点"立即扫描"</div>'; return; }
+      box.innerHTML = '<div class="grid5">'+list.map(m=>pcardHTML(m, "openMovie('"+m.id+"')")).join('')+'</div>';
+    }else if(libTab==='series' && !libSeriesId){
+      if(force || !libSeries.length) libSeries = await fetch('/api/library/series').then(r=>r.json());
+      var sl = (libSeries||[]).filter(match);
+      if(!sl.length){ box.innerHTML='<div class="empty">暂无电视剧，请先点"立即扫描"</div>'; return; }
+      box.innerHTML = '<div class="grid5">'+sl.map(s=>{
+        var sub = (s.seasons?s.seasons+' 季':'')+(s.seasons&&s.episodes?' · ':'')+(s.episodes?s.episodes+' 集':'');
+        return '<div class="pcard" onclick="openSeries(\''+s.id+'\')"><div class="pimg"><span class="pt">'+esc(s.title)+'</span>'+
+          posterImg(s.poster, s.title)+'</div><div class="pmeta"><div class="t">'+esc(s.title)+'</div>'+
+          '<div class="s">'+(s.year||'')+(sub?' · '+sub:'')+'</div></div></div>';
+      }).join('')+'</div>';
+    }else if(libSeriesId && !libSeason){
+      var seasons = await fetch('/api/library/seasons?series='+encodeURIComponent(libSeriesId)).then(r=>r.json());
+      var head = '<div class="shead"><div class="pimg"><span class="pt">'+esc(libSeriesTitle)+'</span>'+
+        posterImg(libSeriesPoster, libSeriesTitle)+'</div><div class="info"><h3>'+esc(libSeriesTitle)+'</h3>'+
+        '<div class="ov">'+esc(libSeriesOv||'暂无简介')+'</div></div></div>';
+      if(!seasons.length){ box.innerHTML = head+'<div class="empty">暂无季信息</div>'; return; }
+      box.innerHTML = head+'<div class="grid5">'+seasons.map(sn=>pcardHTML(
+        {title:'第 '+sn.season+' 季', year:'', poster:sn.poster}, "openSeason("+sn.season+")"
+      )).join('')+'</div>';
+    }else{
+      var eps = await fetch('/api/library/episodes?series='+encodeURIComponent(libSeriesId)+'&season='+libSeason).then(r=>r.json());
+      if(!eps.length){ box.innerHTML='<div class="empty">这一季暂无剧集</div>'; return; }
+      box.innerHTML = eps.map(e=>{
+        var code = 'S'+String(e.season).padStart(2,'0')+'E'+String(e.episode).padStart(2,'0');
+        return '<div class="eprow"><div class="ep">'+code+'</div><div class="ov">'+esc(e.overview||'暂无简介')+'</div>'+
+          statusBadge(e.subStatus)+'<button class="small" data-id="'+esc(e.id)+'" onclick="searchOne(this)">搜字幕</button></div>';
+      }).join('');
+    }
+  }catch(e){ box.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
 }
+function openMovie(id){
+  var m = (libMovies||[]).find(x=>x.id===id);
+  if(!m) return;
+  document.getElementById('movieBox').innerHTML =
+    '<div class="shead"><div class="pimg"><span class="pt">'+esc(m.title)+'</span>'+posterImg(m.poster,m.title)+'</div>'+
+    '<div class="info"><h3>'+esc(m.title)+(m.year?' ('+m.year+')':'')+'</h3>'+
+    '<div class="ov">'+esc(m.overview||'暂无简介')+'</div></div></div>'+
+    '<div class="mrow">'+statusBadge(m.subStatus)+
+    '<button class="small" data-id="'+esc(m.id)+'" onclick="searchOne(this)">搜字幕</button>'+
+    '<button class="ghost small" onclick="closeMovie()">关闭</button></div>';
+  document.getElementById('movieModal').style.display = 'flex';
+}
+function closeMovie(){ document.getElementById('movieModal').style.display = 'none'; }
+function openSeries(id){
+  var s = (libSeries||[]).find(x=>x.id===id);
+  if(!s) return;
+  libSeriesId = id; libSeriesTitle = s.title; libSeriesPoster = s.poster; libSeriesOv = s.overview; libSeason = 0;
+  renderLibView(true);
+}
+function openSeason(n){ libSeason = n; renderLibView(true); }
 async function searchOne(btn){
   const id = btn.getAttribute('data-id');
   btn.disabled = true; const old = btn.textContent; btn.textContent = '搜索中…';
@@ -239,7 +353,7 @@ async function searchOne(btn){
     const r = await fetch('/api/search-one',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
     const j = await r.json();
     alert(j.ok ? j.message : ('失败：'+(j.detail||'未知错误')));
-    loadLib(); load();
+    closeMovie(); renderLibView(true); load();
   }catch(e){ alert('请求失败：'+e.message); }
   btn.disabled = false; btn.textContent = old;
 }

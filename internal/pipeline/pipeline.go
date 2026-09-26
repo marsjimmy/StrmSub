@@ -4,8 +4,12 @@ package pipeline
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,6 +50,81 @@ type Result struct {
 
 func New(cfg *config.Config, providers []metadata.Provider, sources []subsource.Source, st *store.Store) *Pipeline {
 	return &Pipeline{cfg: cfg, providers: providers, sources: sources, store: st}
+}
+
+// PosterFetcher 元数据提供方可实现：按引用下载海报字节
+type PosterFetcher interface {
+	FetchPoster(ctx context.Context, ref string) ([]byte, error)
+}
+
+// ensurePoster 确保海报落盘到 data/posters/，设置 m.PosterPath。
+// 引用是本地已存在文件则拷贝，否则找实现 PosterFetcher 的 provider 下载。
+// 已下载过（按引用哈希判重）则直接复用，失败静默跳过。
+func (p *Pipeline) ensurePoster(ctx context.Context, m *metadata.MediaInfo) {
+	ref := strings.TrimSpace(m.PosterURL)
+	if ref == "" {
+		return
+	}
+	dir := filepath.Join(p.cfg.DataDir, "posters")
+	sum := sha1.Sum([]byte(ref))
+	name := hex.EncodeToString(sum[:])
+	for _, ext := range []string{".jpg", ".png", ".webp", ".gif"} {
+		if _, err := os.Stat(filepath.Join(dir, name+ext)); err == nil {
+			m.PosterPath = "posters/" + name + ext
+			return
+		}
+	}
+	var data []byte
+	if st, err := os.Stat(ref); err == nil && !st.IsDir() && st.Size() < 5<<20 {
+		// 本地文件（NFO thumb 解析出的绝对路径）
+		if b, err := os.ReadFile(ref); err == nil {
+			data = b
+		}
+	} else {
+		for _, pr := range p.getProviders() {
+			if f, ok := pr.(PosterFetcher); ok {
+				if b, err := f.FetchPoster(ctx, ref); err == nil {
+					data = b
+					break
+				}
+			}
+		}
+	}
+	if len(data) == 0 || len(data) > 5<<20 {
+		return
+	}
+	ext := sniffImageExt(data)
+	if ext == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	rel := "posters/" + name + ext
+	if err := os.WriteFile(filepath.Join(p.cfg.DataDir, rel), data, 0o644); err != nil {
+		return
+	}
+	m.PosterPath = rel
+}
+
+func sniffImageExt(b []byte) string {
+	if len(b) < 12 {
+		return ""
+	}
+	if b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF {
+		return ".jpg"
+	}
+	if b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G' {
+		return ".png"
+	}
+	if b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F' &&
+		b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P' {
+		return ".webp"
+	}
+	if b[0] == 'G' && b[1] == 'I' && b[2] == 'F' {
+		return ".gif"
+	}
+	return ""
 }
 
 func (p *Pipeline) LastResult() Result {
@@ -123,6 +202,12 @@ func (p *Pipeline) RunOnce(ctx context.Context) Result {
 			}
 			seen[m.ID+m.FilePath] = true
 			allMedia = append(allMedia, m)
+			if m.Type == metadata.Series || m.Type == metadata.Season {
+				// 剧/季条目只入库（供媒体库展示），不参与字幕搜索
+				p.ensurePoster(ctx, &m)
+				_ = p.store.UpsertMedia(m)
+				continue
+			}
 			res.Total++
 			p.processOne(ctx, m, &res)
 		}
@@ -193,6 +278,7 @@ func (p *Pipeline) processOne(ctx context.Context, m metadata.MediaInfo, res *Re
 		res.Skipped++
 		return SearchSkipped
 	}
+	p.ensurePoster(ctx, &m)
 	_ = p.store.UpsertMedia(m)
 
 	if downloader.HasSubtitle(strm) {

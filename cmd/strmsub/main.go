@@ -22,6 +22,8 @@ import (
 	"github.com/marsjimmy/strmsub/internal/subsource/assrt"
 	"github.com/marsjimmy/strmsub/internal/subsource/opensubtitles"
 	"github.com/marsjimmy/strmsub/internal/subsource/subdl"
+	"github.com/marsjimmy/strmsub/internal/subsource/subhd"
+	"github.com/marsjimmy/strmsub/internal/subsource/xunlei"
 	"github.com/marsjimmy/strmsub/internal/web"
 )
 
@@ -70,7 +72,7 @@ func main() {
 	defer cancel()
 	go sched.Start(ctx)
 
-	srv := &http.Server{Addr: cfg.Addr, Handler: web.New(st, pipe, sched, stg, rebuild).Handler()}
+	srv := &http.Server{Addr: cfg.Addr, Handler: web.New(st, pipe, sched, stg, cfg.DataDir, rebuild).Handler()}
 	log.Printf("[strmsub] 启动，监听 %s，仪表盘 http://<host>%s", cfg.Addr, cfg.Addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
@@ -105,6 +107,8 @@ func buildSources(cfg *config.Config, stg *config.Settings) []subsource.Source {
 		assrt.New(sub.AssrtToken),
 		opensubtitles.New(sub.OSAPIKey, sub.OSUser, sub.OSPass),
 		subdl.New(sub.SubDLKey),
+		subhd.New(),  // 免 key
+		xunlei.New(), // 免 key，按视频 CID 查询
 	}
 	for _, s := range srcs {
 		log.Printf("[source] %s enabled=%v", s.Name(), s.Enabled())

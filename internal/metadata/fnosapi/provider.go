@@ -34,6 +34,8 @@ type apiItem struct {
 	Title    string
 	Category string
 	Path     string
+	Overview string // 简介
+	Poster   string // 海报引用（URL/相对路径）
 	Meta     map[string]any
 	raw      map[string]any
 }
@@ -45,10 +47,52 @@ func parseItem(m map[string]any) apiItem {
 	it.Category = strOf(m, "category", "type")
 	// 注意：列表里的 path 常是海报路径，真实文件路径从详情接口拿
 	it.Path = strOf(m, "path")
+	it.Overview = strOf(m, "overview", "plot", "description", "summary", "intro", "storyline")
+	it.Poster = extractPosterRef(m)
+	if it.Poster == "" && looksLikeImage(it.Path) {
+		it.Poster = it.Path // path 常是海报路径
+	}
 	if meta, ok := m["meta"].(map[string]any); ok {
 		it.Meta = meta
+		if it.Overview == "" {
+			it.Overview = strOf(meta, "overview", "plot", "description", "summary")
+		}
+		if it.Poster == "" {
+			it.Poster = extractPosterRef(meta)
+		}
 	}
 	return it
+}
+
+// extractPosterRef 从条目里抠海报引用（字段名防御式匹配）
+func extractPosterRef(m map[string]any) string {
+	for _, k := range []string{"poster", "poster_path", "posterpath", "thumb", "thumbnail",
+		"cover", "cover_path", "artwork", "image", "img", "pic", "poster_url"} {
+		if s := strOf(m, k); s != "" {
+			return s
+		}
+	}
+	// 嵌套 images: {"poster": "..."} / [{"type":"poster","url":"..."}]
+	if im, ok := m["images"].(map[string]any); ok {
+		for _, k := range []string{"poster", "thumb", "cover"} {
+			if s := strOf(im, k); s != "" {
+				return s
+			}
+		}
+	}
+	if arr, ok := m["images"].([]any); ok {
+		for _, e := range arr {
+			if em, ok := e.(map[string]any); ok {
+				t := strings.ToLower(strOf(em, "type", "kind"))
+				if strings.Contains(t, "poster") || strings.Contains(t, "thumb") {
+					if s := strOf(em, "url", "path", "src"); s != "" {
+						return s
+					}
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // ListMedia 拉取全库：电影直接收录，电视剧展开季/集。
@@ -142,13 +186,48 @@ func (p *Provider) expandItem(ctx context.Context, it apiItem) ([]metadata.Media
 		p.fillPath(ctx, &mi, it.GUID, it)
 		return []metadata.MediaInfo{mi}, nil
 	}
+	// 电视剧：先收录剧条目本身（剧级海报/简介），再展开季/集
+	seriesMi := metadata.MediaInfo{
+		ID:          it.GUID,
+		Type:        metadata.Series,
+		Title:       it.Title,
+		Year:        numOf([]string{"year", "release_year", "air_year"}, it.raw, it.Meta),
+		ImdbID:      normImdb(strOf(it.raw, "imdb_id", "imdbid")),
+		TmdbID:      strOf(it.raw, "tmdb_id", "tmdbid"),
+		Overview:    it.Overview,
+		PosterURL:   it.Poster,
+		Source:      "fnosapi",
+	}
+	if seriesMi.Year == 0 {
+		seriesMi.Year = yearOf(strOf(it.raw, "release_date", "first_air_date", "premiered"))
+	}
+	out := []metadata.MediaInfo{seriesMi}
+
 	// 电视剧：季列表 -> 集列表
 	seasons, err := p.getList(ctx, apiPrefix+"/season/list/"+it.GUID)
 	if err != nil {
-		return nil, fmt.Errorf("季列表失败: %w", err)
+		return out, nil // 季拉不到也别丢了剧条目
 	}
-	var out []metadata.MediaInfo
-	for _, s := range seasons {
+	for i, s := range seasons {
+		sn := numOf([]string{"season", "season_number"}, s.raw, s.Meta)
+		if sn == 0 {
+			sn = i + 1
+		}
+		seasonID := s.GUID
+		if seasonID == "" {
+			seasonID = it.GUID + "/S" + pad2(sn)
+		}
+		out = append(out, metadata.MediaInfo{
+			ID:         seasonID,
+			Type:       metadata.Season,
+			Title:      it.Title,
+			Year:       seriesMi.Year,
+			Season:     sn,
+			SeriesID:   it.GUID,
+			Overview:   s.Overview,
+			PosterURL:  s.Poster,
+			Source:     "fnosapi",
+		})
 		episodes, err := p.getList(ctx, apiPrefix+"/episode/list/"+s.GUID)
 		if err != nil {
 			log.Printf("[fnosapi] 集列表失败 %s: %v", s.Title, err)
@@ -160,21 +239,27 @@ func (p *Provider) expandItem(ctx context.Context, it apiItem) ([]metadata.Media
 				Type:          metadata.Episode,
 				Title:         it.Title, // 用剧名做标题，单集名不参与字幕搜索
 				OriginalTitle: strOf(it.raw, "original_title", "originaltitle"),
-				Year:          numOf([]string{"year", "release_year", "air_year"}, it.raw, it.Meta),
-				Season:        numOf([]string{"season", "season_number"}, ep.raw, ep.Meta),
+				Year:          seriesMi.Year,
+				Season:        sn,
 				Episode:       numOf([]string{"episode", "episode_number", "index"}, ep.raw, ep.Meta),
-				ImdbID:        normImdb(strOf(it.raw, "imdb_id", "imdbid")),
-				TmdbID:        strOf(it.raw, "tmdb_id", "tmdbid"),
+				SeriesID:      it.GUID,
+				ImdbID:        seriesMi.ImdbID,
+				TmdbID:        seriesMi.TmdbID,
+				Overview:      ep.Overview,
 				Source:        "fnosapi",
-			}
-			if mi.Year == 0 {
-				mi.Year = yearOf(strOf(it.raw, "release_date", "first_air_date", "premiered"))
 			}
 			p.fillPath(ctx, &mi, ep.GUID, ep)
 			out = append(out, mi)
 		}
 	}
 	return out, nil
+}
+
+func pad2(n int) string {
+	if n < 10 {
+		return "0" + strconv.Itoa(n)
+	}
+	return strconv.Itoa(n)
 }
 
 func (p *Provider) movieInfo(it apiItem) metadata.MediaInfo {
@@ -186,12 +271,19 @@ func (p *Provider) movieInfo(it apiItem) metadata.MediaInfo {
 		Year:          numOf([]string{"year", "release_year"}, it.raw, it.Meta),
 		ImdbID:        normImdb(strOf(it.raw, "imdb_id", "imdbid")),
 		TmdbID:        strOf(it.raw, "tmdb_id", "tmdbid"),
+		Overview:      it.Overview,
+		PosterURL:     it.Poster,
 		Source:        "fnosapi",
 	}
 	if mi.Year == 0 {
 		mi.Year = yearOf(strOf(it.raw, "release_date", "premiered"))
 	}
 	return mi
+}
+
+// FetchPoster 下载海报字节（pipeline 在扫描时调用，结果存 data/posters/）
+func (p *Provider) FetchPoster(ctx context.Context, ref string) ([]byte, error) {
+	return p.client.GetBytes(ctx, ref)
 }
 
 // getList 拿返回 {"code":0,"data":[...]} 的列表型接口
@@ -264,6 +356,15 @@ func looksLikeMedia(s string) bool {
 		return false
 	}
 	return strings.HasPrefix(s, "/") || strings.HasPrefix(ls, "http")
+}
+
+// looksLikeImage 粗判是不是图片引用
+func looksLikeImage(s string) bool {
+	ls := strings.ToLower(s)
+	return strings.Contains(ls, ".jpg") || strings.Contains(ls, ".jpeg") ||
+		strings.Contains(ls, ".png") || strings.Contains(ls, ".webp") ||
+		strings.Contains(ls, "poster") || strings.Contains(ls, "thumb") ||
+		strings.Contains(ls, "cover") || strings.Contains(ls, "artwork")
 }
 
 // pickMediaPath 列表里 path 可能是海报，这里只做透传，looksLikeMedia 已过滤
