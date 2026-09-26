@@ -1,0 +1,41 @@
+# StrmSub on 飞牛 fnOS
+# 部署目录: /vol1/1000/docker/strmsub
+# 启动: cd /vol1/1000/docker/strmsub && docker compose up -d
+# 仪表盘: http://<飞牛IP>:8099  → 右上角 ⚙️ 设置里配飞牛影视 API
+services:
+  strmsub:
+    image: marsjimmyliu/strmsub:v1.0.3
+    container_name: strmsub
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    environment:
+      TZ: Asia/Shanghai
+      STRMSUB_ADDR: ":8099"
+      STRMSUB_DATA_DIR: /app/data
+      # 媒体目录: 字幕写到 .strm 旁边, 需要写权限
+      STRMSUB_MEDIA_DIRS: /media
+      STRMSUB_SCAN_INTERVAL: 30m
+      STRMSUB_TARGET_LANG: zh-Hans
+      # 字幕源 token (去 https://assrt.net/usercp.php 免费拿)
+      STRMSUB_ASSRT_TOKEN: ${ASSRT_TOKEN:-}
+      STRMSUB_OS_API_KEY: ${OS_API_KEY:-}
+      STRMSUB_OS_USER: ${OS_USER:-}
+      STRMSUB_OS_PASS: ${OS_PASS:-}
+      STRMSUB_SUBDL_KEY: ${SUBDL_KEY:-}
+      # 飞牛影视 API (二选一, 推荐在仪表盘设置页里配, 这里留空也行)
+      # 注意: 容器里访问宿主机服务, 把下面换成飞牛的局域网 IP
+      STRMSUB_FNOS_API_URL: ${FNOS_API_URL:-}
+      STRMSUB_FNOS_API_USER: ${FNOS_API_USER:-}
+      STRMSUB_FNOS_API_PASS: ${FNOS_API_PASS:-}
+      # 路径映射: 飞牛侧绝对路径 -> 容器内路径 (API 返回的是飞牛视角的路径)
+      STRMSUB_PATH_MAP: ${PATH_MAP:-/vol1/1000/smartstrm:/media}
+    volumes:
+      # 媒体目录 (只读挂载也行, 但字幕就写不进去了; 要写字幕就别加 :ro)
+      - /vol1/1000/smartstrm:/media
+      # 数据目录: 数据库 + settings.json (飞牛 API 账号密码存这里)
+      - /vol1/1000/docker/strmsub/data:/app/data
+    # 镜像默认以 root 运行, 保证能读写媒体目录和数据目录。
+    # 如需以普通用户运行, 取消下面注释并把 uid 换成你的用户,
+    # 同时 chown -R <uid> /vol1/1000/docker/strmsub/data /vol1/1000/smartstrm
+    # user: "1026"

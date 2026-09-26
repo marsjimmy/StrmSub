@@ -1,0 +1,19 @@
+# Binaries
+/strmsub
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+
+# Go workspace
+go.work
+
+# Data dirs (runtime)
+/data/
+
+# Env with secrets
+.env
