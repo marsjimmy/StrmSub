@@ -1,7 +1,5 @@
-// Package metadata 定义"媒体是谁"的抽象。
-// 识别不靠猜文件名，而是靠已经刮削好的元数据：
-//   - 飞牛影视：自有 SQLite（trimmedia.db），只读挂载
-//   - NFO：Kodi/Jellyfin/TMM 等写入的 .nfo（兼容备用）
+// Package metadata 定义字幕搜索用的媒体信息抽象。
+// 标题来自文件名正则识别（可自定义规则），无需依赖外部元数据 API。
 package metadata
 
 import "context"
@@ -17,7 +15,7 @@ const (
 
 // MediaInfo 一部电影、一部剧、一季或一集剧集。
 type MediaInfo struct {
-	ID            string // provider 内唯一键（飞牛 guid / nfo 路径）
+	ID            string // 媒体唯一键（sha1 路径哈希）
 	Type          MediaType
 	Title         string
 	OriginalTitle string
@@ -28,10 +26,10 @@ type MediaInfo struct {
 	ImdbID        string // tt1234567
 	TmdbID        string
 	Overview      string // 简介
-	PosterURL     string // 海报原始引用（URL/相对路径/本地路径，provider 填）
-	PosterPath    string // 已下载到 data/posters/ 的相对路径（pipeline 填）
-	FilePath      string // 对应的 .strm 文件路径
-	Source        string // "fnos" / "nfo"
+	PosterURL     string // 海报原始引用（URL/相对路径/本地路径）
+	PosterPath    string // 本地封面路径（library 扫描时识别）
+	FilePath      string // 对应的视频文件路径
+	Source        string // 标题来源: "rule" / "nfo" / "builtin"
 }
 
 // DisplayName 展示用名称

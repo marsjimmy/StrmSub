@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -101,7 +102,7 @@ func (c *Client) Search(ctx context.Context, m metadata.MediaInfo) ([]subsource.
 		surl := s.Surl
 		out = append(out, subsource.Candidate{
 			Source: "xunlei",
-			RefID:  s.Scid,
+			RefID:  s.Scid + "|" + url.QueryEscape(surl),
 			Name:   s.Sname,
 			Lang:   lang,
 			Format: formatOf(s.Sname),
@@ -113,6 +114,19 @@ func (c *Client) Search(ctx context.Context, m metadata.MediaInfo) ([]subsource.
 		})
 	}
 	return out, nil
+}
+
+// DownloadRef 按 RefID（scid|urlencode(surl)）下载
+func (c *Client) DownloadRef(ctx context.Context, refID string) (string, []byte, error) {
+	parts := strings.SplitN(refID, "|", 2)
+	if len(parts) != 2 {
+		return "", nil, fmt.Errorf("xunlei refID 非法")
+	}
+	surl, err := url.QueryUnescape(parts[1])
+	if err != nil || surl == "" {
+		return "", nil, fmt.Errorf("xunlei refID 非法: %s", refID)
+	}
+	return c.download(ctx, surl)
 }
 
 // normLang 映射迅雷的 language 字段："简体&英语"→双语，"简体"→简体，"繁体"→繁体，"未知语言"→other

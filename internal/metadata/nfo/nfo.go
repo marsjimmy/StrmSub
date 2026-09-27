@@ -1,5 +1,5 @@
 // Package nfo 解析 Kodi/Jellyfin/TMM 等写入的 .nfo 文件。
-// 作为飞牛 SQLite 的补充：当某条媒体在飞牛库里缺 ID 时，用同目录 .nfo 补全。
+// 标题识别时作为自定义正则之后的第二优先级：同名 .nfo 里的 <title>/<year>。
 package nfo
 
 import (

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,10 +39,10 @@ func (c *Client) Enabled() bool { return c.apiKey != "" }
 type searchResp struct {
 	Data []struct {
 		Attributes struct {
-			SubtitleID  string `json:"subtitle_id"`
-			Language    string `json:"language"`
-			DownloadCount int  `json:"download_count"`
-			Files []struct {
+			SubtitleID    string `json:"subtitle_id"`
+			Language      string `json:"language"`
+			DownloadCount int    `json:"download_count"`
+			Files         []struct {
 				FileID   int    `json:"file_id"`
 				FileName string `json:"file_name"`
 			} `json:"files"`
@@ -102,7 +103,7 @@ func (c *Client) Search(ctx context.Context, m metadata.MediaInfo) ([]subsource.
 		fname := a.Files[0].FileName
 		out = append(out, subsource.Candidate{
 			Source: "opensubtitles",
-			RefID:  a.SubtitleID,
+			RefID:  fmt.Sprintf("%d|%s", fileID, fname),
 			Name:   fname,
 			Lang:   lang,
 			Format: "srt",
@@ -114,6 +115,19 @@ func (c *Client) Search(ctx context.Context, m metadata.MediaInfo) ([]subsource.
 		})
 	}
 	return out, nil
+}
+
+// DownloadRef 按 RefID（fileID|fname）下载
+func (c *Client) DownloadRef(ctx context.Context, refID string) (string, []byte, error) {
+	parts := strings.SplitN(refID, "|", 2)
+	if len(parts) != 2 {
+		return "", nil, fmt.Errorf("opensubtitles refID 非法")
+	}
+	fileID, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return "", nil, fmt.Errorf("opensubtitles refID 非法: %s", refID)
+	}
+	return c.download(ctx, fileID, parts[1])
 }
 
 func (c *Client) login(ctx context.Context) error {

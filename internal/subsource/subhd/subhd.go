@@ -262,6 +262,14 @@ type manifestResp struct {
 	File    *previewFile  `json:"file"`
 }
 
+// DownloadRef 按 RefID（subhd sid）下载
+func (c *Client) DownloadRef(ctx context.Context, refID string) (string, []byte, error) {
+	if refID == "" {
+		return "", nil, fmt.Errorf("subhd refID 为空")
+	}
+	return c.download(ctx, refID)
+}
+
 func (c *Client) download(ctx context.Context, sid string) (string, []byte, error) {
 	referer := baseURL + "/a/" + sid
 	body, err := c.get(ctx, fmt.Sprintf("%s/api/sub/preview/%s?manifest=1", baseURL, sid), referer)

@@ -1,7 +1,7 @@
+# StrmSub v2 本地开发用 compose（发布用 deploy/fnos/docker-compose.yml）
 services:
   strmsub:
-    build: .
-    image: strmsub:latest
+    image: marsjimmyliu/strmsub:v2.0.0
     container_name: strmsub
     restart: unless-stopped
     ports:
@@ -10,25 +10,17 @@ services:
       TZ: Asia/Shanghai
       STRMSUB_ADDR: ":8099"
       STRMSUB_DATA_DIR: /app/data
-      # 飞牛影视 API 接入（Emby 式，推荐）：配了就走 HTTP API，不需要挂载 db
-      STRMSUB_FNOS_API_URL: ${STRMSUB_FNOS_API_URL:-}
-      STRMSUB_FNOS_API_USER: ${STRMSUB_FNOS_API_USER:-}
-      STRMSUB_FNOS_API_PASS: ${STRMSUB_FNOS_API_PASS:-}
-      # 路径映射：飞牛侧绝对路径 -> 容器内路径
-      STRMSUB_PATH_MAP: ${STRMSUB_PATH_MAP:-}
-      # 飞牛影视库直读（备选）：宿主机只读挂载
-      STRMSUB_FNOS_DB: /data/trimmedia.db
-      # 媒体目录：字幕写到 .strm 旁边，需要读写权限
+      # 媒体目录：扫描 + 字幕落盘需要读写权限
       STRMSUB_MEDIA_DIRS: /media
       STRMSUB_SCAN_INTERVAL: 30m
       STRMSUB_TARGET_LANG: zh-Hans
+      STRMSUB_SUB_DIR: ${SUB_DIR:-}
+      STRMSUB_FLARESOLVERR_URL: ${FLARESOLVERR_URL:-}
       STRMSUB_ASSRT_TOKEN: ${ASSRT_TOKEN:-}
       STRMSUB_OS_API_KEY: ${OS_API_KEY:-}
       STRMSUB_OS_USER: ${OS_USER:-}
       STRMSUB_OS_PASS: ${OS_PASS:-}
       STRMSUB_SUBDL_KEY: ${SUBDL_KEY:-}
     volumes:
-      # ⚠️ 按你的飞牛实际路径修改下面两行
-      - /usr/local/apps/@appdata/trim.media/database/trimmedia.db:/data/trimmedia.db:ro
       - /vol1/1000/media:/media
       - ./data:/app/data

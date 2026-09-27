@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,8 +31,8 @@ func New(token string) *Client {
 	return &Client{token: token, http: &http.Client{Timeout: 30 * time.Second}}
 }
 
-func (c *Client) Name() string    { return "assrt" }
-func (c *Client) Enabled() bool   { return c.token != "" }
+func (c *Client) Name() string  { return "assrt" }
+func (c *Client) Enabled() bool { return c.token != "" }
 
 // throttle 配额 20/min，这里按 3.2 秒间隔保守节流
 func (c *Client) throttle() {
@@ -47,14 +48,14 @@ type searchResp struct {
 	Status int `json:"status"`
 	Sub    struct {
 		Subs []struct {
-			ID         int    `json:"id"`
-			NativeName string `json:"native_name"`
-			Videoname  string `json:"videoname"`
-			Subtype    string `json:"subtype"`
-			UploadTime string `json:"upload_time"`
-			VoteScore  int    `json:"vote_score"`
+			ID          int    `json:"id"`
+			NativeName  string `json:"native_name"`
+			Videoname   string `json:"videoname"`
+			Subtype     string `json:"subtype"`
+			UploadTime  string `json:"upload_time"`
+			VoteScore   int    `json:"vote_score"`
 			ReleaseSite string `json:"release_site"`
-			Lang       struct {
+			Lang        struct {
 				Desc string `json:"desc"`
 			} `json:"lang"`
 		} `json:"subs"`
@@ -192,6 +193,15 @@ func (c *Client) searchOne(ctx context.Context, m metadata.MediaInfo, q string) 
 		})
 	}
 	return out, nil
+}
+
+// DownloadRef 按 RefID（字幕 id）下载
+func (c *Client) DownloadRef(ctx context.Context, refID string) (string, []byte, error) {
+	id, err := strconv.Atoi(refID)
+	if err != nil {
+		return "", nil, fmt.Errorf("assrt refID 非法: %s", refID)
+	}
+	return c.download(ctx, id)
 }
 
 // download 取详情→选最合适的单文件→下载（详情接口的 url 有时效，选中时才调）
