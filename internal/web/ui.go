@@ -37,11 +37,14 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,"PingFang 
 .card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
 .card .num{font-size:26px;font-weight:700}
 .card .label{color:var(--muted);font-size:12px;margin-top:4px}
-.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px}
-.btn:hover{background:var(--accent2)}
-.btn.ghost{background:var(--bg3);border:1px solid var(--line)}
-.btn.small{padding:5px 10px;font-size:12px}
-.btn:disabled{opacity:.5;cursor:default}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-size:14px;font-weight:600;transition:filter .15s ease,transform .08s ease,box-shadow .15s ease}
+.btn:hover{filter:brightness(1.12);box-shadow:0 2px 10px rgba(59,130,246,.35)}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.btn.ghost{background:var(--bg3);border:1px solid var(--line);color:var(--text)}
+.btn.ghost:hover{background:#262d38;border-color:var(--accent);filter:none}
+.btn.small{padding:6px 12px;font-size:12px;border-radius:7px}
+.btn:disabled{opacity:.5;cursor:default;transform:none;box-shadow:none}
 input[type=text],input[type=password],input[type=number],select{background:var(--bg3);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font-size:14px;width:100%}
 textarea{background:var(--bg3);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;width:100%;font-family:monospace}
 .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
@@ -77,12 +80,14 @@ tr:last-child td{border-bottom:none}
 .row{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
 .row label{min-width:110px;color:var(--muted);font-size:13px}
 .row .grow{flex:1;min-width:200px}
-.switch{position:relative;width:40px;height:22px;flex:none}
+.switch{position:relative;display:inline-block;vertical-align:middle;width:48px;height:26px;flex:none}
 .switch input{opacity:0;width:0;height:0}
-.switch .sl{position:absolute;inset:0;background:var(--bg3);border:1px solid var(--line);border-radius:20px;cursor:pointer;transition:.15s}
-.switch .sl:before{content:"";position:absolute;width:16px;height:16px;left:2px;top:2px;background:var(--muted);border-radius:50%;transition:.15s}
-.switch input:checked + .sl{background:var(--accent2)}
-.switch input:checked + .sl:before{transform:translateX(18px);background:#fff}
+.switch .sl{position:absolute;inset:0;background:var(--bg3);border:1px solid var(--line);border-radius:20px;cursor:pointer;transition:background .2s ease,border-color .2s ease,box-shadow .2s ease}
+.switch .sl:before{content:"";position:absolute;width:20px;height:20px;left:2px;top:2px;background:var(--muted);border-radius:50%;transition:transform .22s cubic-bezier(.34,1.35,.44,1),background .2s ease}
+.switch input:checked + .sl{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+.switch input:checked + .sl:before{transform:translateX(22px);background:#fff}
+.switch input:focus-visible + .sl{outline:2px solid var(--accent2);outline-offset:2px}
+.switch .sl:active:before{width:24px}
 .rule{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--bg3)}
 .rule .rp{font-family:monospace;font-size:12px;color:var(--accent);word-break:break-all}
 .hint{font-size:12px;color:var(--muted);line-height:1.7;margin-top:8px}
@@ -152,6 +157,11 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function $(id) { return document.getElementById(id); }
+// "2026-09-27T14:31:16.611996711+08:00" -> "2026-09-27 14:31:16"
+function fmtTime(s) {
+  var m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/.exec(String(s || ''));
+  return m ? m[1] + ' ' + m[2] : String(s || '');
+}
 function subBadge(st) {
   if (st === 'ok') return '<span class="badge ok">已有字幕</span>';
   if (st === 'failed') return '<span class="badge failed">下载失败</span>';
@@ -215,7 +225,7 @@ function renderHome() {
     h += '<div class="card"><div class="num" style="font-size:15px">+' + st.lastAdded + ' / ~' + st.lastUpdated + ' / −' + st.lastRemoved + '</div><div class="label">上次扫描 增/改/删</div></div>';
     h += '</div>';
     h += '<div class="sec"><h3>字幕源状态</h3><div>' + srcs + '</div>';
-    h += '<div class="hint">媒体目录：' + st.mediaDirs.map(esc).join('；') + '<br>字幕保存：' + esc(st.subtitleDir || '视频同目录') + '<br>目标语言：' + esc(st.targetLang) + ' · 扫描周期：' + esc(st.scanInterval) + ' · 自动下载：' + (st.autoDownload ? '开' : '关') + '<br>上次扫描：' + esc(st.lastScan || '尚未扫描') + '</div></div>';
+    h += '<div class="hint">媒体目录：' + st.mediaDirs.map(esc).join('；') + '<br>字幕保存：' + esc(st.subtitleDir || '视频同目录') + '<br>目标语言：' + esc(st.targetLang) + ' · 扫描周期：' + esc(st.scanInterval) + ' · 自动下载：' + (st.autoDownload ? '开' : '关') + '<br>上次扫描：' + esc(st.lastScan ? fmtTime(st.lastScan) : '尚未扫描') + '</div></div>';
     h += '<div class="sec"><h3>最近下载</h3><div id="homeHist"><span class="spin"></span> 加载中…</div></div>';
     el.innerHTML = h;
     api('/api/history?limit=10').then(function(list){
@@ -223,7 +233,7 @@ function renderHome() {
       if (!list || !list.length) { t.innerHTML = '<div class="empty">暂无下载记录</div>'; return; }
       var rows = list.map(function(r){
         var st2 = r.status === 'ok' ? '<span class="badge ok">成功</span>' : '<span class="badge failed">失败</span>';
-        return '<tr><td>' + esc(r.media_title || r.filename) + '</td><td>' + esc(r.source) + '</td><td>' + st2 + '</td><td>' + esc(r.created_at) + '</td></tr>';
+        return '<tr><td>' + esc(r.media_title || r.filename) + '</td><td>' + esc(r.source) + '</td><td>' + st2 + '</td><td>' + esc(fmtTime(r.created_at)) + '</td></tr>';
       }).join('');
       t.innerHTML = '<table><tr><th>标题</th><th>来源</th><th>状态</th><th>时间</th></tr>' + rows + '</table>';
     });
@@ -344,7 +354,7 @@ function loadHistory() {
       var st2 = r.status === 'ok' ? '<span class="badge ok">成功</span>' : '<span class="badge failed">失败</span>';
       return '<tr><td>' + esc(r.media_title || r.filename) + '</td><td>' + esc(r.source) + '</td>' +
         '<td title="' + esc(r.save_path || '') + '">' + esc(shortPath(r.save_path)) + '</td>' +
-        '<td>' + st2 + '</td><td>' + esc(r.created_at) + '</td></tr>';
+        '<td>' + st2 + '</td><td>' + esc(fmtTime(r.created_at)) + '</td></tr>';
     }).join('');
     t.innerHTML = '<table><tr><th>标题</th><th>来源</th><th>保存路径</th><th>状态</th><th>时间</th></tr>' + rows + '</table>';
   });
@@ -366,7 +376,7 @@ function renderSettings() {
     s.sources.forEach(function(src){
       var on = s.toggles[src.name] !== false;
       h += '<div class="row"><label><b>' + esc(src.name) + '</b>' + (src.enabled ? '' : ' <span class="tag">缺凭证</span>') + '</label>' +
-        '<label class="switch"><input type="checkbox" data-src="' + esc(src.name) + '"' + (on ? ' checked' : '') + '><span class="sl"></span></label>' +
+        '<label class="switch"><input type="checkbox" data-src="' + esc(src.name) + '"' + (on ? ' checked' : '') + ' onchange="srcToggle(this)"><span class="sl"></span></label>' +
         '<span class="note">' + (on ? '启用' : '停用') + '</span></div>';
       if (src.name === 'assrt') h += '<div class="row"><label>ASSRT Token</label><div class="grow"><input type="text" id="f_assrt" value="' + esc(s.assrtToken) + '" placeholder="ASSRT API token"></div></div>';
       if (src.name === 'opensubtitles') {
@@ -454,6 +464,10 @@ function addRule() {
     if (r.ok) { $('ruleName').value = ''; $('rulePattern').value = ''; loadRules(); }
     else alert('添加失败');
   }).catch(function(e){ alert(e.message); });
+}
+function srcToggle(c) {
+  var n = c.closest('.row').querySelector('.note');
+  if (n) n.textContent = c.checked ? '\u542f\u7528' : '\u505c\u7528';
 }
 function toggleRule(id, en) {
   var rl = null;

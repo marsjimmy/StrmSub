@@ -1,7 +1,7 @@
 # StrmSub v2 本地开发用 compose（发布用 deploy/fnos/docker-compose.yml）
 services:
   strmsub:
-    image: marsjimmyliu/strmsub:v2.0.4
+    image: marsjimmyliu/strmsub:v2.0.5
     container_name: strmsub
     restart: unless-stopped
     ports:
