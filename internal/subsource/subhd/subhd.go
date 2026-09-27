@@ -84,14 +84,14 @@ func buildQueries(m metadata.MediaInfo) []string {
 		if t == "" {
 			continue
 		}
-		switch {
-		case m.Type == metadata.Episode && m.Season > 0 && m.Episode > 0:
-			out = append(out, fmt.Sprintf("%s S%02dE%02d", t, m.Season, m.Episode))
-		case m.Year > 0:
+		// 注意：不要把 SxxExx 塞进关键词。subhd 的搜索对空格分词做 AND 匹配，
+		// "金装律师 S01E05" 会返回 0 条（已实测），而 "金装律师" 有 20 条。
+		// 季集过滤由 matcher 按候选名里的 SxxExx 完成。
+		if m.Type != metadata.Episode && m.Year > 0 {
 			out = append(out, fmt.Sprintf("%s %d", t, m.Year))
-		default:
-			out = append(out, t)
+			continue
 		}
+		out = append(out, t)
 	}
 	return out
 }

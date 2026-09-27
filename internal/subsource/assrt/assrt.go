@@ -97,19 +97,23 @@ func (c *Client) get(ctx context.Context, path string, params url.Values) ([]byt
 	return body, nil
 }
 
-// buildQuery 用标题+年份/季集构造搜索词（ASSRT 只支持关键词搜索）
-func buildQuery(m metadata.MediaInfo) string {
+// buildQueries 构造搜索词列表。ASSRT 只支持关键词搜索，不确定服务端对
+// "标题 SxxExx" 是否做 AND 匹配（subhd 已实测会返回 0 条），保险起见剧集
+// 同时搜"标题 SxxExx"和纯"标题"，调用方合并去重。
+func buildQueries(m metadata.MediaInfo) []string {
 	title := m.Title
 	if title == "" {
 		title = m.OriginalTitle
 	}
+	var out []string
 	if m.Type == metadata.Episode && m.Season > 0 && m.Episode > 0 {
-		return fmt.Sprintf("%s S%02dE%02d", title, m.Season, m.Episode)
+		out = append(out, fmt.Sprintf("%s S%02dE%02d", title, m.Season, m.Episode))
 	}
 	if m.Year > 0 {
-		return fmt.Sprintf("%s %d", title, m.Year)
+		out = append(out, fmt.Sprintf("%s %d", title, m.Year))
 	}
-	return title
+	out = append(out, title)
+	return out
 }
 
 // normLang 从 lang.desc 识别语言："简"/"中"→简体，"繁"→繁体，"双语"→双语
@@ -130,12 +134,21 @@ func normLang(desc string) string {
 
 func (c *Client) Search(ctx context.Context, m metadata.MediaInfo) ([]subsource.Candidate, error) {
 	// 先用标题搜；剧集/电影若有原名（中↔英）且不同，再用原名搜一次，合并候选
-	queries := []string{buildQuery(m)}
+	queries := buildQueries(m)
 	if m.OriginalTitle != "" && m.OriginalTitle != m.Title {
 		m2 := m
 		m2.Title, m2.OriginalTitle = m.OriginalTitle, m.Title
-		if q := buildQuery(m2); q != queries[0] {
-			queries = append(queries, q)
+		for _, q := range buildQueries(m2) {
+			dup := false
+			for _, e := range queries {
+				if e == q {
+					dup = true
+					break
+				}
+			}
+			if !dup {
+				queries = append(queries, q)
+			}
 		}
 	}
 	var out []subsource.Candidate

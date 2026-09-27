@@ -141,7 +141,9 @@ func TestBuildQueries(t *testing.T) {
 	}
 	e := metadata.MediaInfo{Title: "绝命毒师", Type: metadata.Episode, Season: 1, Episode: 2}
 	qs = buildQueries(e)
-	if len(qs) != 1 || qs[0] != "绝命毒师 S01E02" {
+	// 剧集不再把 SxxExx 塞进关键词（subhd 对 "绝命毒师 S01E02" 返回 0 条），
+	// 季集过滤由 matcher 按候选名完成
+	if len(qs) != 1 || qs[0] != "绝命毒师" {
 		t.Fatalf("qs=%v", qs)
 	}
 }

@@ -114,7 +114,7 @@ code{background:var(--bg3);border:1px solid var(--line);border-radius:4px;paddin
       <a href="#/subtitles" data-p="subtitles">📝 字幕</a>
       <a href="#/settings" data-p="settings">⚙️ 设置</a>
     </nav>
-    <div class="foot">v2.0.2 · 正则识别<br>· 6 字幕源聚合</div>
+    <div class="foot">v2.0.3 · 正则识别<br>· 6 字幕源聚合</div>
   </aside>
   <div id="main">
     <div id="topbar">
