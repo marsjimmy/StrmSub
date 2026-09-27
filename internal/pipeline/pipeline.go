@@ -123,7 +123,19 @@ func (p *Pipeline) SearchMedia(ctx context.Context, mediaID string) (*search.Res
 	if err != nil || e == nil {
 		return nil, store.MediaEntry{}, fmt.Errorf("找不到该媒体")
 	}
-	return p.searcher.Search(ctx, e.Title, entryMedia(*e)), *e, nil
+	return p.searcher.Search(ctx, SearchKeyword(*e), entryMedia(*e)), *e, nil
+}
+
+// SearchKeyword 搜索关键词：剧集带上季集（金装律师 S01E05），电影只用标题
+func SearchKeyword(e store.MediaEntry) string {
+	switch {
+	case e.Season > 0 && e.Episode > 0:
+		return fmt.Sprintf("%s S%02dE%02d", e.Title, e.Season, e.Episode)
+	case e.Episode > 0:
+		return fmt.Sprintf("%s E%02d", e.Title, e.Episode)
+	default:
+		return e.Title
+	}
 }
 
 // SearchKeyword 手动关键词聚合搜索

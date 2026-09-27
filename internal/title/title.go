@@ -12,6 +12,10 @@ import (
 	"github.com/marsjimmy/strmsub/internal/metadata/nfo"
 )
 
+// BuiltinVersion 内置识别逻辑版本。改动内置规则、NFO 解析、目录兜底等逻辑时
+// 把它 +1，已索引媒体的 rule_sig 会对不上，下次扫描自动重新识别标题。
+const BuiltinVersion = 3
+
 // Rule 一条识别规则；Pattern 支持命名分组 (?P<title>...) (?P<year>...) (?P<season>...) (?P<episode>...)
 type Rule struct {
 	ID      int64

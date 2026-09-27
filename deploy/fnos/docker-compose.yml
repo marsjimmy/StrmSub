@@ -7,7 +7,7 @@
 #   首次启动可用下面的环境变量播种, 之后以数据库为准。
 services:
   strmsub:
-    image: marsjimmyliu/strmsub:v2.0.1
+    image: marsjimmyliu/strmsub:v2.0.2
     container_name: strmsub
     restart: unless-stopped
     ports:

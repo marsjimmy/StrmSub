@@ -13,6 +13,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/marsjimmy/strmsub/internal/title"
 )
 
 type Store struct{ db *sql.DB }
@@ -143,13 +145,14 @@ func (s *Store) DeleteTitleRule(id int64) error {
 	return err
 }
 
-// RulesSignature 已启用规则的签名；扫描时比对，变了就重新识别标题
+// RulesSignature 已启用规则的签名；扫描时比对，变了就重新识别标题。
+// 内置识别逻辑版本也参与签名，升级程序后旧条目会自动重新识别。
 func (s *Store) RulesSignature() string {
 	rules, err := s.ListTitleRules()
 	if err != nil {
 		return ""
 	}
-	var parts []string
+	parts := []string{fmt.Sprintf("builtin:%d", title.BuiltinVersion)}
 	for _, r := range rules {
 		if r.Enabled {
 			parts = append(parts, fmt.Sprintf("%d:%s", r.Ord, r.Pattern))
