@@ -136,7 +136,8 @@ func TestDetectLang(t *testing.T) {
 func TestBuildQueries(t *testing.T) {
 	m := metadata.MediaInfo{Title: "沙丘", OriginalTitle: "Dune", Year: 2021, Type: metadata.Movie}
 	qs := buildQueries(m)
-	if len(qs) != 2 || qs[0] != "沙丘 2021" || qs[1] != "Dune 2021" {
+	// 电影也不再拼年份（"V字仇杀队 2005" 在 subhd 返回 0 条），永远纯标题
+	if len(qs) != 2 || qs[0] != "沙丘" || qs[1] != "Dune" {
 		t.Fatalf("qs=%v", qs)
 	}
 	e := metadata.MediaInfo{Title: "绝命毒师", Type: metadata.Episode, Season: 1, Episode: 2}
@@ -144,6 +145,12 @@ func TestBuildQueries(t *testing.T) {
 	// 剧集不再把 SxxExx 塞进关键词（subhd 对 "绝命毒师 S01E02" 返回 0 条），
 	// 季集过滤由 matcher 按候选名完成
 	if len(qs) != 1 || qs[0] != "绝命毒师" {
+		t.Fatalf("qs=%v", qs)
+	}
+	// 冒号会被清洗（"Top Gun: Maverick" 在 subhd 返回 0 条）
+	c := metadata.MediaInfo{Title: "Top Gun: Maverick", Year: 2022, Type: metadata.Movie}
+	qs = buildQueries(c)
+	if len(qs) != 1 || qs[0] != "Top Gun Maverick" {
 		t.Fatalf("qs=%v", qs)
 	}
 }

@@ -100,10 +100,11 @@ func (c *Client) get(ctx context.Context, path string, params url.Values) ([]byt
 // buildQueries 构造搜索词列表。ASSRT 只支持关键词搜索，不确定服务端对
 // "标题 SxxExx" 是否做 AND 匹配（subhd 已实测会返回 0 条），保险起见剧集
 // 同时搜"标题 SxxExx"和纯"标题"，调用方合并去重。
+// 标题先过 SanitizeQuery（冒号等会杀死某些源的搜索，见 subsource.SanitizeQuery）。
 func buildQueries(m metadata.MediaInfo) []string {
-	title := m.Title
+	title := subsource.SanitizeQuery(m.Title)
 	if title == "" {
-		title = m.OriginalTitle
+		title = subsource.SanitizeQuery(m.OriginalTitle)
 	}
 	var out []string
 	if m.Type == metadata.Episode && m.Season > 0 && m.Episode > 0 {

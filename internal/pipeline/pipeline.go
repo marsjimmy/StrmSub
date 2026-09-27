@@ -201,27 +201,44 @@ func (p *Pipeline) DownloadBest(ctx context.Context, mediaID string) (string, er
 		return "", err
 	}
 	cands := p.searcher.ToCandidates(res.Groups)
-	best := matcher.PickBest(cands, entryMedia(e), p.store.TargetLang())
-	if best == nil {
+	ranked := matcher.PickRanked(cands, entryMedia(e), p.store.TargetLang())
+	if len(ranked) == 0 || ranked[0].Score < 30 {
 		_ = p.store.SetMediaSub(mediaID, "missing", "", "")
 		return "", fmt.Errorf("无合适字幕")
 	}
-	fname, data, err := best.Download(ctx)
-	if err != nil {
-		p.record(best.Source, best.Name, "", e.Title, "failed", err.Error())
-		_ = p.store.SetMediaSub(mediaID, "failed", "", best.Source)
-		return "", err
+	// 按分数从高到低依次尝试下载：最佳候选下载失败就换下一个，
+	// 而不是直接放弃（比如 subhd 某个预览无可用内容，换条候选往往能下到）
+	var lastErr error
+	tried := 0
+	for _, rc := range ranked {
+		if rc.Score < 30 || tried >= 3 {
+			break
+		}
+		tried++
+		best := rc.Candidate
+		fname, data, err := best.Download(ctx)
+		if err != nil {
+			p.record(best.Source, best.Name, "", e.Title, "failed", err.Error())
+			log.Printf("[pipeline] 候选下载失败，换下一个: %s [%s]: %v", best.Name, best.Source, err)
+			lastErr = err
+			continue
+		}
+		saved, err := downloader.SaveWithDir(e.FilePath, p.store.SubtitleDir(), p.store.TargetLang(), fname, data)
+		if err != nil {
+			p.record(best.Source, best.Name, "", e.Title, "failed", err.Error())
+			_ = p.store.SetMediaSub(mediaID, "failed", "", best.Source)
+			return "", fmt.Errorf("保存失败: %v", err)
+		}
+		p.record(best.Source, best.Name, saved, e.Title, "ok", "")
+		_ = p.store.SetMediaSub(mediaID, "ok", saved, best.Source)
+		log.Printf("[pipeline] 已下载最佳: %s ← %s [%s]", e.Title, best.Name, best.Source)
+		return saved, nil
 	}
-	saved, err := downloader.SaveWithDir(e.FilePath, p.store.SubtitleDir(), p.store.TargetLang(), fname, data)
-	if err != nil {
-		p.record(best.Source, best.Name, "", e.Title, "failed", err.Error())
-		_ = p.store.SetMediaSub(mediaID, "failed", "", best.Source)
-		return "", fmt.Errorf("保存失败: %v", err)
+	_ = p.store.SetMediaSub(mediaID, "failed", "", ranked[0].Candidate.Source)
+	if lastErr != nil {
+		return "", lastErr
 	}
-	p.record(best.Source, best.Name, saved, e.Title, "ok", "")
-	_ = p.store.SetMediaSub(mediaID, "ok", saved, best.Source)
-	log.Printf("[pipeline] 已下载最佳: %s ← %s [%s]", e.Title, best.Name, best.Source)
-	return saved, nil
+	return "", fmt.Errorf("无合适字幕")
 }
 
 func (p *Pipeline) record(source, filename, savePath, mediaTitle, status, detail string) {

@@ -13,27 +13,31 @@ import (
 
 // PickBest 返回得分最高的候选；若最高分低于阈值则返回 nil（视为无合适字幕）
 func PickBest(cands []subsource.Candidate, m metadata.MediaInfo, targetLang string) *subsource.Candidate {
-	type scored struct {
-		c subsource.Candidate
-		s int
+	ranked := PickRanked(cands, m, targetLang)
+	if len(ranked) == 0 || ranked[0].Score < 30 {
+		return nil
 	}
-	var ss []scored
+	c := ranked[0].Candidate
+	return &c
+}
+
+// RankedCandidate 带分数的候选，按分数从高到低排列
+type RankedCandidate struct {
+	Candidate subsource.Candidate
+	Score     int
+}
+
+// PickRanked 返回所有通过语言门槛的候选（分数>0），按分数从高到低排序。
+// 供下载时按顺序尝试：最佳候选下载失败就换下一个，而不是直接放弃。
+func PickRanked(cands []subsource.Candidate, m metadata.MediaInfo, targetLang string) []RankedCandidate {
+	var out []RankedCandidate
 	for _, c := range cands {
-		s := score(c, m, targetLang)
-		if s > 0 {
-			ss = append(ss, scored{c, s})
+		if s := score(c, m, targetLang); s > 0 {
+			out = append(out, RankedCandidate{c, s})
 		}
 	}
-	if len(ss) == 0 {
-		return nil
-	}
-	sort.Slice(ss, func(i, j int) bool { return ss[i].s > ss[j].s })
-	best := ss[0]
-	// 阈值：语言都不对的直接淘汰（score 已处理），这里防"只有一条但完全不相关"
-	if best.s < 30 {
-		return nil
-	}
-	return &best.c
+	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	return out
 }
 
 func score(c subsource.Candidate, m metadata.MediaInfo, targetLang string) int {

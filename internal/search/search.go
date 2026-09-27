@@ -18,6 +18,10 @@ import (
 // CacheTTL 搜索缓存有效期
 const CacheTTL = 6 * time.Hour
 
+// querySchemaVersion 查询构造版本。改动各源的查询构造逻辑（关键词清洗、
+// 季集/年份拼接等）时 +1，让旧缓存失效——缓存键本身感知不到查询逻辑变化。
+const querySchemaVersion = 2
+
 type Searcher struct {
 	store   *store.Store
 	ttl     time.Duration
@@ -74,7 +78,7 @@ type Result struct {
 }
 
 func cacheKey(source, keyword string, m metadata.MediaInfo) string {
-	return fmt.Sprintf("search:%s|%s|%d|%d|%d", source, keyword, m.Year, m.Season, m.Episode)
+	return fmt.Sprintf("search:v%d:%s|%s|%d|%d|%d", querySchemaVersion, source, keyword, m.Year, m.Season, m.Episode)
 }
 
 // Search 聚合搜索：各启用的源并行查询，带缓存

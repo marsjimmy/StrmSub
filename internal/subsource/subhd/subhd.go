@@ -78,20 +78,19 @@ func buildQueries(m metadata.MediaInfo) []string {
 	if m.OriginalTitle != "" && m.OriginalTitle != m.Title {
 		titles = append(titles, m.OriginalTitle)
 	}
+	// 注意：永远只用纯标题搜。subhd 的站内搜索对空格分词做 AND 匹配，
+	// 年份（"V字仇杀队 2005"→0 条）、季集（"金装律师 S01E05"→0 条）、
+	// 冒号（"Top Gun: Maverick"→0 条）都会杀光结果（均已实测）。
+	// 年份/季集过滤由 matcher 按候选名完成。
+	seen := map[string]bool{}
 	var out []string
 	for _, t := range titles {
-		t = strings.TrimSpace(t)
-		if t == "" {
+		q := subsource.SanitizeQuery(t)
+		if len([]rune(strings.TrimSpace(q))) < 2 || seen[q] {
 			continue
 		}
-		// 注意：不要把 SxxExx 塞进关键词。subhd 的搜索对空格分词做 AND 匹配，
-		// "金装律师 S01E05" 会返回 0 条（已实测），而 "金装律师" 有 20 条。
-		// 季集过滤由 matcher 按候选名里的 SxxExx 完成。
-		if m.Type != metadata.Episode && m.Year > 0 {
-			out = append(out, fmt.Sprintf("%s %d", t, m.Year))
-			continue
-		}
-		out = append(out, t)
+		seen[q] = true
+		out = append(out, q)
 	}
 	return out
 }
@@ -164,9 +163,15 @@ func (c *Client) Search(ctx context.Context, m metadata.MediaInfo) ([]subsource.
 func relevant(e entry, m metadata.MediaInfo) bool {
 	hay := strings.ToLower(e.name + " " + e.detail)
 	for _, t := range []string{m.Title, m.OriginalTitle} {
-		t = strings.ToLower(strings.TrimSpace(t))
-		if len([]rune(t)) >= 2 && strings.Contains(hay, t) {
-			return true
+		// 原始标题和清洗后的都比对：候选名可能是 "Top Gun: Maverick" 也可能是
+		// "Top Gun Maverick"，而搜索词是清洗过的
+		for _, v := range []string{
+			strings.ToLower(strings.TrimSpace(t)),
+			strings.ToLower(subsource.SanitizeQuery(t)),
+		} {
+			if len([]rune(v)) >= 2 && strings.Contains(hay, v) {
+				return true
+			}
 		}
 	}
 	return false

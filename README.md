@@ -39,7 +39,7 @@
 3. 打开 `http://<飞牛IP>:8099`，设置页配字幕源、正则规则
 4. 点「扫描」建立媒体索引，然后在媒体页搜字幕、下载
 
-镜像：`marsjimmyliu/strmsub:v2.0.3`（`latest` 同步），仅 `linux/amd64`，默认 root 运行。
+镜像：`marsjimmyliu/strmsub:v2.0.4`（`latest` 同步），仅 `linux/amd64`，默认 root 运行。
 
 ## 环境变量（首次启动播种）
 

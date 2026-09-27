@@ -8,9 +8,20 @@ package subsource
 
 import (
 	"context"
+	"strings"
 
 	"github.com/marsjimmy/strmsub/internal/metadata"
 )
+
+// SanitizeQuery 清洗站内搜索关键词。某些源（如 subhd）的站内搜索对空格分词做
+// AND 匹配，冒号（"Top Gun: Maverick"→0 条）、年份（"V字仇杀队 2005"→0 条）、
+// 季集（"金装律师 S01E05"→0 条）都会让搜索直接返回空（均已实测）。
+// 清洗只影响发给源的查询词，不影响标题识别与匹配器打分。
+func SanitizeQuery(t string) string {
+	t = strings.ReplaceAll(t, ":", " ")
+	t = strings.ReplaceAll(t, "：", " ")
+	return strings.Join(strings.Fields(t), " ")
+}
 
 // 语言归一化值
 const (
