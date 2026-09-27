@@ -71,6 +71,10 @@ func (r *Recognizer) Recognize(videoPath string) Result {
 			return res
 		}
 	}
+	// 3.5 文件名以 SxxExx/Ep 开头、无标题部分 → 用目录名做剧名
+	if res, ok := fromDir(base, videoPath); ok {
+		return res
+	}
 	// 4. 清洗兜底
 	return Result{Title: cleanTitle(base), RuleID: -2, RuleName: "文件名清洗"}
 }
@@ -122,16 +126,66 @@ func applyRule(re *regexp.Regexp, base string) (Result, bool) {
 }
 
 func fromNFO(videoPath string) (Result, bool) {
-	nfoPath := strings.TrimSuffix(videoPath, filepath.Ext(videoPath)) + ".nfo"
-	if _, err := os.Stat(nfoPath); err != nil {
+	candidates := []string{
+		strings.TrimSuffix(videoPath, filepath.Ext(videoPath)) + ".nfo",
+		filepath.Join(filepath.Dir(videoPath), "tvshow.nfo"),
+		filepath.Join(filepath.Dir(filepath.Dir(videoPath)), "tvshow.nfo"),
+	}
+	for _, nfoPath := range candidates {
+		if _, err := os.Stat(nfoPath); err != nil {
+			continue
+		}
+		mi, ok := nfo.ParseFile(nfoPath)
+		if !ok || mi.Title == "" {
+			continue
+		}
+		return Result{Title: mi.Title, Year: mi.Year, Season: mi.Season, Episode: mi.Episode,
+			RuleID: -1, RuleName: "NFO"}, true
+	}
+	return Result{}, false
+}
+
+// fromDir 文件名以 SxxExx / E(P)xx 开头且无标题部分时，用所在目录名做剧名，
+// 季集从文件名提取。/media/电视剧/金装律师 1-9季/S01/S01E05.xxx.strm → 金装律师 S01E05
+func fromDir(base, videoPath string) (Result, bool) {
+	title := dirSeriesTitle(videoPath)
+	if title == "" {
 		return Result{}, false
 	}
-	mi, ok := nfo.ParseFile(nfoPath)
-	if !ok || mi.Title == "" {
-		return Result{}, false
+	if m := reDirSE.FindStringSubmatch(base); m != nil {
+		return Result{Title: title, Season: atoi(m[1]), Episode: atoi(m[2]),
+			RuleID: 0, RuleName: "目录名+季集"}, true
 	}
-	return Result{Title: mi.Title, Year: mi.Year, Season: mi.Season, Episode: mi.Episode,
-		RuleID: -1, RuleName: "NFO"}, true
+	if m := reDirE.FindStringSubmatch(base); m != nil {
+		return Result{Title: title, Episode: atoi(m[1]),
+			RuleID: 0, RuleName: "目录名+集号"}, true
+	}
+	return Result{}, false
+}
+
+var (
+	reDirSE = regexp.MustCompile(`(?i)^[Ss](\d{1,2})[Ee](\d{1,3})`)
+	reDirE  = regexp.MustCompile(`(?i)^[Ee][Pp]?(\d{1,3})\b`)
+	// 季目录：S01 / Season 2 / 第3季 / 纯数字
+	reSeasonDir = regexp.MustCompile(`(?i)^(?:s|season)?\s*\d{1,2}$|^第\d+\s*季$`)
+	// 目录名末尾的季标记： " 1-9季" / " 第1-3季" / " S02" / " Season 1" / " 第2季"
+	reDirSeasonSuffix = regexp.MustCompile(`\s*(?:第?\d+\s*-\s*\d+\s*季|[Ss]\d{1,2}|[Ss]eason\s*\d{1,2}|第\d+\s*季)$`)
+)
+
+// dirSeriesTitle 从视频所在目录推导剧名：父目录是季目录时取祖父目录，
+// 并去掉末尾的季标记（"金装律师 1-9季" → "金装律师"）。
+func dirSeriesTitle(videoPath string) string {
+	dir := filepath.Dir(videoPath)
+	base := strings.TrimSpace(filepath.Base(dir))
+	if reSeasonDir.MatchString(base) {
+		base = strings.TrimSpace(filepath.Base(filepath.Dir(dir)))
+	}
+	base = reDirSeasonSuffix.ReplaceAllString(base, "")
+	base = strings.TrimSpace(base)
+	if base == "" || base == "." || base == "/" {
+		return ""
+	}
+	return cleanTitle(base)
 }
 
 type defPattern struct {

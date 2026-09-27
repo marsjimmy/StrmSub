@@ -41,6 +41,17 @@ type nfoEpisode struct {
 	UniqueIDs []uniqueID `xml:"uniqueid"`
 }
 
+type nfoTvshow struct {
+	XMLName       xml.Name   `xml:"tvshow"`
+	Title         string     `xml:"title"`
+	OriginalTitle string     `xml:"originaltitle"`
+	Year          int        `xml:"year"`
+	Premiered     string     `xml:"premiered"`
+	Plot          string     `xml:"plot"`
+	Thumb         string     `xml:"thumb"`
+	UniqueIDs     []uniqueID `xml:"uniqueid"`
+}
+
 type Provider struct {
 	mediaDirs []string
 }
@@ -105,10 +116,9 @@ func ParseFile(path string) (metadata.MediaInfo, bool) {
 			return metadata.MediaInfo{}, false
 		}
 		mi.Type = metadata.Episode
+		// 注意：没有 <showtitle> 时不再回退到单集 <title>（分集名做搜索关键词无意义，
+		// 且会导致“识别成 Bail Out”这类误识别）；调用方会用目录名兜底。
 		mi.Title = strings.TrimSpace(e.ShowTitle)
-		if mi.Title == "" {
-			mi.Title = strings.TrimSpace(e.Title)
-		}
 		mi.Season, mi.Episode = e.Season, e.Episode
 		if len(e.Aired) >= 4 {
 			mi.Year, _ = strconv.Atoi(e.Aired[:4])
@@ -116,6 +126,21 @@ func ParseFile(path string) (metadata.MediaInfo, bool) {
 		mi.ImdbID, mi.TmdbID = ids(e.UniqueIDs)
 		mi.Overview = strings.TrimSpace(e.Plot)
 		mi.PosterURL = resolveNFOThumb(path, strings.TrimSpace(e.Thumb))
+	case "tvshow":
+		var t nfoTvshow
+		if err := xml.Unmarshal(data, &t); err != nil {
+			return metadata.MediaInfo{}, false
+		}
+		mi.Type = metadata.Series
+		mi.Title = strings.TrimSpace(t.Title)
+		mi.OriginalTitle = strings.TrimSpace(t.OriginalTitle)
+		mi.Year = t.Year
+		if mi.Year == 0 && len(t.Premiered) >= 4 {
+			mi.Year, _ = strconv.Atoi(t.Premiered[:4])
+		}
+		mi.ImdbID, mi.TmdbID = ids(t.UniqueIDs)
+		mi.Overview = strings.TrimSpace(t.Plot)
+		mi.PosterURL = resolveNFOThumb(path, strings.TrimSpace(t.Thumb))
 	default:
 		return metadata.MediaInfo{}, false // tvshow/season 等暂不需要
 	}

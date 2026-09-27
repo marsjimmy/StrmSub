@@ -7,7 +7,7 @@
 #   首次启动可用下面的环境变量播种, 之后以数据库为准。
 services:
   strmsub:
-    image: marsjimmyliu/strmsub:v2.0.0
+    image: marsjimmyliu/strmsub:v2.0.1
     container_name: strmsub
     restart: unless-stopped
     ports:
@@ -22,6 +22,8 @@ services:
       STRMSUB_TARGET_LANG: zh-Hans
       # 字幕统一保存目录 (留空=视频同目录)
       STRMSUB_SUB_DIR: ${SUB_DIR:-}
+      # 扫描后自动下载缺失的中文字幕 (默认 true)
+      STRMSUB_AUTO_DOWNLOAD: ${AUTO_DOWNLOAD:-true}
       # FlareSolverr (可选, 用于过 Cloudflare 反爬)
       STRMSUB_FLARESOLVERR_URL: ${FLARESOLVERR_URL:-}
       # 字幕源 token (首次启动播种用; 之后在设置页改)

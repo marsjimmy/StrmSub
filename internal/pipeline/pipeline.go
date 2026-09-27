@@ -26,6 +26,7 @@ type Pipeline struct {
 	searcher *search.Searcher
 
 	mu         sync.Mutex
+	runMu      sync.Mutex // RunOnce 串行锁：定时扫描与手动扫描重叠时只跑一轮
 	lastScan   time.Time
 	lastResult library.ScanResult
 }
@@ -34,8 +35,10 @@ func New(cfg *config.Config, st *store.Store, scanner *library.Scanner, searcher
 	return &Pipeline{cfg: cfg, store: st, scanner: scanner, searcher: searcher}
 }
 
-// RunOnce 跑一轮增量扫描（scheduler 定时/手动触发）
+// RunOnce 跑一轮增量扫描（scheduler 定时/手动触发）；扫描后自动补字幕
 func (p *Pipeline) RunOnce(ctx context.Context) library.ScanResult {
+	p.runMu.Lock()
+	defer p.runMu.Unlock()
 	res, err := p.scanner.Scan(ctx)
 	if err != nil {
 		log.Printf("[pipeline] 扫描失败: %v", err)
@@ -45,7 +48,51 @@ func (p *Pipeline) RunOnce(ctx context.Context) library.ScanResult {
 	p.lastResult = res
 	p.mu.Unlock()
 	log.Printf("[pipeline] 扫描完成: 新增%d 更新%d 删除%d 共%d", res.Added, res.Updated, res.Removed, res.Total)
+	if p.store.AutoDownload() {
+		p.autoDownload(ctx)
+	}
 	return res
+}
+
+// autoDownload 扫描后自动补字幕：
+//   - 视频旁边（或字幕目录）已有中文字幕 → 跳过
+//   - 缺失 → 下载最佳匹配；24 小时内下载失败过的不再重试
+func (p *Pipeline) autoDownload(ctx context.Context) {
+	entries, err := p.store.ListMedia("", 100000)
+	if err != nil {
+		log.Printf("[pipeline] 自动下载：读取媒体索引失败: %v", err)
+		return
+	}
+	subDir := p.store.SubtitleDir()
+	var done, skipped, failed int
+	for _, e := range entries {
+		if ctx.Err() != nil {
+			break
+		}
+		if downloader.HasSubtitleIn(e.FilePath, subDir) {
+			if e.SubStatus != "ok" {
+				_ = p.store.SetMediaSub(e.ID, "ok", e.SubPath, e.SubSource)
+			}
+			skipped++
+			continue
+		}
+		if e.SubStatus == "failed" || e.SubStatus == "missing" {
+			if time.Since(e.UpdatedAt) < 24*time.Hour {
+				skipped++
+				continue
+			}
+		}
+		saved, err := p.DownloadBest(ctx, e.ID)
+		if err != nil {
+			log.Printf("[pipeline] 自动下载失败: %s: %v", e.Title, err)
+			failed++
+			continue
+		}
+		log.Printf("[pipeline] 自动下载成功: %s → %s", e.Title, saved)
+		done++
+		time.Sleep(2 * time.Second) // 对源站温柔一点
+	}
+	log.Printf("[pipeline] 自动下载完成: 成功%d 跳过%d 失败%d", done, skipped, failed)
 }
 
 func (p *Pipeline) LastScan() (time.Time, library.ScanResult) {

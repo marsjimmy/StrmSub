@@ -114,7 +114,7 @@ code{background:var(--bg3);border:1px solid var(--line);border-radius:4px;paddin
       <a href="#/subtitles" data-p="subtitles">📝 字幕</a>
       <a href="#/settings" data-p="settings">⚙️ 设置</a>
     </nav>
-    <div class="foot">v2.0.0 · 正则识别<br>· 6 字幕源聚合</div>
+    <div class="foot">v2.0.1 · 正则识别<br>· 6 字幕源聚合</div>
   </aside>
   <div id="main">
     <div id="topbar">
@@ -215,7 +215,7 @@ function renderHome() {
     h += '<div class="card"><div class="num" style="font-size:15px">+' + st.lastAdded + ' / ~' + st.lastUpdated + ' / −' + st.lastRemoved + '</div><div class="label">上次扫描 增/改/删</div></div>';
     h += '</div>';
     h += '<div class="sec"><h3>字幕源状态</h3><div>' + srcs + '</div>';
-    h += '<div class="hint">媒体目录：' + st.mediaDirs.map(esc).join('；') + '<br>字幕保存：' + esc(st.subtitleDir || '视频同目录') + '<br>目标语言：' + esc(st.targetLang) + ' · 扫描周期：' + esc(st.scanInterval) + '<br>上次扫描：' + esc(st.lastScan || '尚未扫描') + '</div></div>';
+    h += '<div class="hint">媒体目录：' + st.mediaDirs.map(esc).join('；') + '<br>字幕保存：' + esc(st.subtitleDir || '视频同目录') + '<br>目标语言：' + esc(st.targetLang) + ' · 扫描周期：' + esc(st.scanInterval) + ' · 自动下载：' + (st.autoDownload ? '开' : '关') + '<br>上次扫描：' + esc(st.lastScan || '尚未扫描') + '</div></div>';
     h += '<div class="sec"><h3>最近下载</h3><div id="homeHist"><span class="spin"></span> 加载中…</div></div>';
     el.innerHTML = h;
     api('/api/history?limit=10').then(function(list){
@@ -389,6 +389,7 @@ function renderSettings() {
     h += '<div class="sec"><h3>通用</h3>' +
       '<div class="row"><label>扫描周期（分钟）</label><div class="grow"><input type="number" id="f_interval" value="' + s.scanInterval + '" min="5"></div></div>' +
       '<div class="row"><label>目标语言</label><div class="grow"><select id="f_lang"><option value="zh-Hans"' + (s.targetLang === 'zh-Hans' ? ' selected' : '') + '>简体中文</option><option value="zh-Hant"' + (s.targetLang === 'zh-Hant' ? ' selected' : '') + '>繁体中文</option></select></div></div>' +
+      '<div class="row"><label>自动下载</label><div class="grow"><label class="switch"><input type="checkbox" id="f_autodl"' + (s.autoDownload ? ' checked' : '') + '><span class="sl"></span></label> <span class="hint">扫描时自动下载缺失的中文字幕，已有的跳过</span></div></div>' +
       '<div class="row"><label>字幕目录</label><div class="grow"><input type="text" id="f_subdir" value="' + esc(s.subtitleDir) + '" placeholder="留空=视频同目录"></div></div>' +
       '<div class="row"><label>FlareSolverr</label><div class="grow"><input type="text" id="f_flare" value="' + esc(s.flaresolverr) + '" placeholder="http://host:8191（可选，用于过 Cloudflare）"></div></div>' +
       '<div class="note">媒体目录：' + s.mediaDirs.map(esc).join('；') + '（通过环境变量配置）</div></div>';
@@ -416,6 +417,7 @@ function saveSettings(btn) {
     subdlKey: $('f_subdl') ? $('f_subdl').value : '',
     scanInterval: parseInt($('f_interval').value, 10) || 60,
     targetLang: $('f_lang').value,
+    autoDownload: $('f_autodl').checked,
     subtitleDir: $('f_subdir').value.trim(),
     flaresolverr: $('f_flare').value.trim()
   };

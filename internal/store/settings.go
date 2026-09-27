@@ -16,6 +16,7 @@ const (
 	KTargetLang    = "target_lang"
 	KSubtitleDir   = "subtitle_dir"
 	KFlareSolverr  = "flaresolverr_url"
+	KAutoDownload  = "auto_download"
 	KCredAssrt     = "cred_assrt_token"
 	KCredOSKey     = "cred_os_api_key"
 	KCredOSUser    = "cred_os_user"
@@ -36,6 +37,13 @@ func (s *Store) SeedFromEnv(cfg *config.Config) {
 		KCredOSUser:   cfg.OSUser,
 		KCredOSPass:   cfg.OSPass,
 		KCredSubDL:    cfg.SubDLKey,
+	}
+	if s.GetKV(KAutoDownload, "") == "" {
+		v := "0"
+		if cfg.AutoDownload {
+			v = "1"
+		}
+		_ = s.SetKV(KAutoDownload, v)
 	}
 	for k, v := range seed {
 		if s.GetKV(k, "") == "" && v != "" {
@@ -79,6 +87,22 @@ func (s *Store) TargetLang() string {
 
 func (s *Store) SubtitleDir() string     { return s.GetKV(KSubtitleDir, "") }
 func (s *Store) FlareSolverrURL() string { return s.GetKV(KFlareSolverr, "") }
+
+// AutoDownload 扫描时是否自动下载缺失的中文字幕（默认开）
+func (s *Store) AutoDownload() bool {
+	if v := s.GetKV(KAutoDownload, ""); v != "" {
+		return v == "1"
+	}
+	return true
+}
+
+func (s *Store) SetAutoDownload(enabled bool) error {
+	v := "0"
+	if enabled {
+		v = "1"
+	}
+	return s.SetKV(KAutoDownload, v)
+}
 
 // SourceEnabled 字幕源开关；def 为该源的默认状态
 func (s *Store) SourceEnabled(name string, def bool) bool {

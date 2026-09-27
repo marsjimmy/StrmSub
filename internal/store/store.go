@@ -271,7 +271,7 @@ func (s *Store) queryMedia(q string, args ...any) ([]MediaEntry, error) {
 			continue
 		}
 		if updated.Valid {
-			e.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05.999999999-07:00", updated.String)
+			e.UpdatedAt = parseDBTime(updated.String)
 		}
 		out = append(out, e)
 	}
@@ -349,6 +349,7 @@ func parseDBTime(s string) time.Time {
 		s = s[:i] // 去掉 time.Time.String() 的单调时钟后缀
 	}
 	layouts := []string{
+		time.RFC3339Nano,
 		"2006-01-02 15:04:05.999999999-07:00",
 		"2006-01-02 15:04:05.999999999 -0700 MST",
 		"2006-01-02 15:04:05.999999999 -0700",

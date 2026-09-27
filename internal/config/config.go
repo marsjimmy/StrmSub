@@ -25,6 +25,8 @@ type Config struct {
 	ScanInterval time.Duration
 	// 目标语言：zh-Hans / zh-Hant
 	TargetLang string
+	// 扫描时自动下载缺失的中文字幕（默认开）
+	AutoDownload bool
 
 	// 字幕源凭证（首次启动写入 SQLite，之后以 SQLite 为准）
 	AssrtToken string
@@ -37,6 +39,18 @@ type Config struct {
 func getenv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+// getenvBool 解析布尔环境变量：1/true/yes/on → true，0/false/no/off → false
+func getenvBool(key string, def bool) bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
 	}
 	return def
 }
@@ -64,6 +78,7 @@ func Load() *Config {
 		FlareSolverrURL: os.Getenv("STRMSUB_FLARESOLVERR_URL"),
 		ScanInterval:    interval,
 		TargetLang:      getenv("STRMSUB_TARGET_LANG", "zh-Hans"),
+		AutoDownload:    getenvBool("STRMSUB_AUTO_DOWNLOAD", true),
 		AssrtToken:      os.Getenv("STRMSUB_ASSRT_TOKEN"),
 		OSApiKey:        os.Getenv("STRMSUB_OS_API_KEY"),
 		OSUser:          os.Getenv("STRMSUB_OS_USER"),

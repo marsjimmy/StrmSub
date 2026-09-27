@@ -92,6 +92,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"lastRemoved":  scanRes.Removed,
 		"targetLang":   s.store.TargetLang(),
 		"scanInterval": s.store.ScanInterval().String(),
+		"autoDownload": s.store.AutoDownload(),
 		"mediaDirs":    s.cfg.MediaDirs,
 		"subtitleDir":  s.store.SubtitleDir(),
 	})
@@ -290,6 +291,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		"subdlKey":     s.store.Cred(store.KCredSubDL),
 		"scanInterval": int(s.store.ScanInterval() / time.Minute),
 		"targetLang":   s.store.TargetLang(),
+		"autoDownload": s.store.AutoDownload(),
 		"subtitleDir":  s.store.SubtitleDir(),
 		"flaresolverr": s.store.FlareSolverrURL(),
 		"apiToken":     s.store.APIToken(),
@@ -308,6 +310,7 @@ type settingsForm struct {
 
 	ScanInterval int    `json:"scanInterval"`
 	TargetLang   string `json:"targetLang"`
+	AutoDownload *bool  `json:"autoDownload"`
 	SubtitleDir  string `json:"subtitleDir"`
 	FlareSolverr string `json:"flaresolverr"`
 }
@@ -333,6 +336,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if f.TargetLang != "" {
 		_ = s.store.SetKV(store.KTargetLang, f.TargetLang)
+	}
+	if f.AutoDownload != nil {
+		_ = s.store.SetAutoDownload(*f.AutoDownload)
 	}
 	_ = s.store.SetKV(store.KSubtitleDir, strings.TrimSpace(f.SubtitleDir))
 	_ = s.store.SetKV(store.KFlareSolverr, strings.TrimSpace(f.FlareSolverr))

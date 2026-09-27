@@ -8,6 +8,7 @@
 - **目录增量索引**：递归扫描常见视频格式（含 `.strm`），按大小/mtime/正则签名判断新增/变化/删除
 - **本地封面**：视频同名图片，或 `poster` / `folder` / `cover` / `movie` 等常见名称
 - **6 字幕源聚合**：ASSRT、OpenSubtitles、SubDL、SubHD、迅雷 + 成人源 SubtitleCat（番号查询），搜索结果缓存 6 小时
+- **扫描自动补字幕**：每次扫描后自动下载缺失的中文字幕，已有的跳过；失败/无结果 24 小时内不重复搜（设置页可开关）
 - **FlareSolverr**：可选，用于过 Cloudflare 反爬的字幕站
 - **设置全进库**：API 令牌（自动生成）、源开关/凭证、正则、扫描周期、字幕目录，环境变量只做首次播种
 - **WebUI**：深色响应式，侧边栏可收起，主页 / 媒体 / 字幕 / 设置四页，`/api/*` 令牌鉴权
@@ -38,7 +39,7 @@
 3. 打开 `http://<飞牛IP>:8099`，设置页配字幕源、正则规则
 4. 点「扫描」建立媒体索引，然后在媒体页搜字幕、下载
 
-镜像：`marsjimmyliu/strmsub:v2.0.0`（`latest` 同步），仅 `linux/amd64`，默认 root 运行。
+镜像：`marsjimmyliu/strmsub:v2.0.1`（`latest` 同步），仅 `linux/amd64`，默认 root 运行。
 
 ## 环境变量（首次启动播种）
 
@@ -53,5 +54,6 @@
 | `STRMSUB_ASSRT_TOKEN` | ASSRT token |
 | `STRMSUB_OS_API_KEY/USER/PASS` | OpenSubtitles 凭证 |
 | `STRMSUB_SUBDL_KEY` | SubDL API key |
+| `STRMSUB_AUTO_DOWNLOAD` | 扫描后自动下载缺失中文字幕，`true`/`false`（默认 `true`） |
 
 之后所有设置在 Web 设置页修改，存 SQLite。
